@@ -46,9 +46,9 @@ def prox_g(C,c_c,eps):
     C_perm = C.permute(2, 0, 1)
     s,U = torch.linalg.eigh(C_perm)
     Vh = U.permute(0, 2, 1)
-    s_new = torch.maximum(torch.tensor(eps, device=C.device, dtype=C.dtype), (s + torch.sqrt(s**2 + 2 * c_c)) / 2)
+    s_new = torch.maximum(torch.tensor(eps, device=s.device), (s + torch.sqrt(s**2 + 2 * c_c)) / 2)
     # s_new = (s + np.sqrt(s**2+2*c_c))/2
-    diag_s = torch.diag_embed(s_new)  
+    diag_s = torch.diag_embed(s_new)
     C_new = torch.einsum('nNv,nvw,nwM -> nNM',U,diag_s,Vh)
     C_new = C_new.permute(1, 2, 0)
     return sym(C_new)
@@ -76,7 +76,7 @@ def Jdiag_init(X,N,K,Rx):
     return W,C
 
 
-def initialize(N,K,init_method,Winit=None,Cinit=None,X=None,Rx=None,seed=None):
+def initialize(N,K,init_method='random',Winit=None,Cinit=None,X=None,Rx=None,seed=None):
     if Winit is not None and Cinit is not None:
         W,C = Winit.clone(),Cinit.clone()
     elif init_method == 'Jdiag':
@@ -87,6 +87,7 @@ def initialize(N,K,init_method,Winit=None,Cinit=None,X=None,Rx=None,seed=None):
     W = W.cuda()
     C = C.cuda()  
     return W,C
+
 
 
 

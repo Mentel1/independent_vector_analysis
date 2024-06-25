@@ -1,0 +1,16 @@
+digraph {
+	Input [label="Input (W, C)
+[W and C are matrices that are flattened and concatenated]"]
+	Flatten [label="Flatten & Concatenate
+[Flatten W and C, then concatenate]"]
+	FC [label="Fully Connected Layer (fc1)
+[Reducing dimensionality to 1]"]
+	Softmax [label="Softmax Activation
+[Normalization]"]
+	Alpha [label="Alpha Value
+[Output]"]
+	Input -> Flatten
+	Flatten -> FC
+	FC -> Softmax
+	Softmax -> Alpha
+}
