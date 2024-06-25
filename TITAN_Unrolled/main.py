@@ -56,7 +56,7 @@ zeta = 0.1
 
 # Hyperparameters
 
-T = 100
+T = 10000
 K = 2
 N = 3
 
@@ -74,11 +74,11 @@ metaparameters_titles_multiparam = ['Case A','Case B','Case C','Case D']
 input_dim = N * N * K + K * K * N 
 N_updates_W = 10
 N_updates_C = 1
-dataset_size = 10
-learning_rate = 1e-1
-num_epochs = 10
-batch_size = 10
-num_layers = 5
+dataset_size = 1
+learning_rate = 1e-4
+num_epochs = 1
+batch_size = 1
+num_layers = 100
 
 
 
@@ -205,7 +205,7 @@ class U_TITAN(nn.Module):
             dataset = MyDataset(T, K, N, metaparameters_multiparam, size = dataset_size)
             self.CreateLoader(dataset=dataset, batch_size=self.batch_size)
             # puts first blocks in evaluation mode: gradient is not computed
-            self.model.GradFalse(layer,self.mode) 
+            #self.model.GradFalse(layer,self.mode) 
             # defines the optimizer
             lr = self.lr
             optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad,self.parameters()),lr=lr)
@@ -215,12 +215,14 @@ class U_TITAN(nn.Module):
                 
                 self.model.Layers[layer].train() # training mode
                 # goes through all minibatches
-                for i,minibatch in enumerate(self.train_loader,0):
+                for i,minibatch in enumerate(self.train_loader):
                     [X, A] = minibatch  # gets the minibatch
                     #print("minibatch size: ", minibatch[0].size())
                     X = X[0]
                     A = A[0]
+                    print("X size: ", X.size())
                     Rx = cov_X(X)
+                    print("Rx size: ", Rx.size())
                     W,C = initialize(N,K,X=X,Rx=Rx)
 
                     W_predicted,C_predicted = self.model(Rx,W,C,self.mode,layer)
@@ -228,14 +230,22 @@ class U_TITAN(nn.Module):
                     # Computes and prints loss
                     loss = self.loss_fun(W_predicted, A)
                     loss_epochs[epoch] += torch.Tensor.item(loss)
-                    sys.stdout.write('\r Epoch %d/%d, minibatch %d/%d, loss: %.4f' % (epoch+1,self.num_epochs,i+1,self.size_train//self.batch_size,loss))
+                    sys.stdout.write('\r Epoch %d/%d, minibatch %d/%d, loss: %.4f \n' % (epoch+1,self.num_epochs,i+1,self.size_train//self.batch_size,loss))
                     
                     # sets the gradients to zero, performs a backward pass, and updates the weights.
                     optimizer.zero_grad()
                     loss.backward()
                     optimizer.step()
 
-                # tests on validation set
+                    # Check gradients
+                    """ for name, param in self.model.named_parameters():
+                        if param.grad is None:
+                            print(f"Parameter '{name}' has no gradient")
+                        else:
+                            print(f"Parameter '{name}' gradient mean: {param.grad.mean().item()}") """
+
+
+            # tests on validation set
                 
             # training is finished
             print('-----------------------------------------------------------------')

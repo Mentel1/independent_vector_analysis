@@ -21,7 +21,9 @@ import torch.nn.functional as F
 import numpy as np
 from functions import *
 from tools import *
-
+from data import *
+from torch.utils.data import DataLoader
+from dataloader_file import *
 
 class ISI_loss():
     """
@@ -48,20 +50,19 @@ class ISI_loss():
         return joint_isi(input, target)
 
 
-
 class FCNN_alpha(nn.Module):
     """
     Predicts the regularization parameter alpha given W and C.
     Attributes
     ----------
-        fc1, fc2, fc3 (torch.nn.Linear): fully connected layers
-        soft          (torch.nn.Softplus): Softplus activation function
+        fc1 (torch.nn.Linear): fully connected layer
+        fc2 (torch.nn.Linear): fully connected layer
+        soft (torch.nn.Softplus): Softplus activation function
     """
-    def __init__(self, input_size, hidden_size1, hidden_size2, output_size=1):
+    def __init__(self, input_size, hidden_size, output_size=1):
         super(FCNN_alpha, self).__init__()
-        self.fc1 = nn.Linear(input_size, hidden_size1)
-        self.fc2 = nn.Linear(hidden_size1, hidden_size2)
-        self.fc3 = nn.Linear(hidden_size2, output_size)
+        self.fc1 = nn.Linear(input_size, hidden_size)
+        self.fc2 = nn.Linear(hidden_size, output_size)
         self.soft = nn.Softplus()
         
     def forward(self, W, C):
@@ -82,8 +83,7 @@ class FCNN_alpha(nn.Module):
         # Concatenate W and C along the last dimension
         x = torch.cat((W, C))
         x = self.soft(self.fc1(x))
-        x = self.soft(self.fc2(x))
-        x = self.fc3(x)
+        x = self.fc2(x)
         x = self.soft(x)
         return x
 
@@ -109,18 +109,16 @@ class W_iter(nn.Module):
     def prox_step(self,c_w,W):
         return prox_f(W, c_w)
 
-    def update(self,Rx,W,W_old,C,c_w,beta_w):
-        W_inertial = self.inertial_step(beta_w,W,W_old)
-        W_old = W.clone()
+    def update(self,Rx,W,W_j_1,C,c_w,beta_w):
+        W_inertial = self.inertial_step(beta_w,W,W_j_1)
         W_gradient = self.gradient_step(Rx,c_w,W_inertial,C)
         W_prox = self.prox_step(c_w,W_gradient)
-        return W_prox,W_old
+        return W_prox,W
     
-    def forward(self,Rx,W,C,c_w,beta_w):
-        W_old = W.clone()
+    def forward(self,Rx,W,W_j_1,C,c_w,beta_w):
         for _ in range(self.N_updates_W):
-            W,W_old = self.update(Rx,W,W_old,C,c_w,beta_w)
-        return W
+            W,W_j_1 = self.update(Rx,W,W_j_1,C,c_w,beta_w)
+        return W,W_j_1
     
 
 
@@ -140,18 +138,17 @@ class C_iter(nn.Module):
     def prox_step(self,c_c,C,eps):
         return prox_g(C, c_c, eps)
     
-    def update(self,Rx,C,C_old,W_updated,c_c,beta_c,alpha,eps):
-        C_inertial = self.inertial_step(beta_c,C,C_old)
-        C_old = C.clone()
+    def update(self,Rx,C,C_j_1,W_updated,c_c,beta_c,alpha,eps):
+        C_inertial = self.inertial_step(beta_c,C,C_j_1)
         C_gradient = self.gradient_step(Rx,c_c,C_inertial,W_updated,alpha)
         C_prox = self.prox_step(c_c,C_gradient,eps)
-        return C_prox,C_old
+        return C_prox,C
 
-    def forward(self,Rx,C,W_updated,c_c,beta_c,alpha,eps):
+    def forward(self,Rx,C,C_j_1,W_updated,c_c,beta_c,alpha,eps):
+        C_i_1 = C.clone()
         for _ in range(self.N_updates_C):
-            C_old = C.clone()
-            C,C_old = self.update(Rx,C,C_old,W_updated,c_c,beta_c,alpha,eps)
-            return C,C_old
+            C,C_j_1 = self.update(Rx,C,C_j_1,W_updated,c_c,beta_c,alpha,eps)
+        return C,C_j_1,C_i_1
 
 
 
@@ -175,7 +172,7 @@ class Block(nn.Module):
     
         super(Block, self).__init__()
         self.input_dim = input_dim
-        self.NN_alpha = FCNN_alpha(input_dim, 64, 32)
+        self.NN_alpha = FCNN_alpha(input_dim, 32)
         #self.soft         = nn.Softplus()
         #self.reg_mul      = nn.Parameter(torch.FloatTensor([-7]).cuda()) 
         #self.reg_constant = nn.Parameter(torch.FloatTensor([-5]).cuda())
@@ -187,7 +184,7 @@ class Block(nn.Module):
         self.nu = nu
         self.zeta = zeta
     
-    def get_coefficients(self,Rx,alpha,C,C_old):
+    def get_coefficients(self,Rx,alpha,C,C_i_1):
         
         K,_,N = C.shape
         #print("alpha",alpha)
@@ -200,23 +197,25 @@ class Block(nn.Module):
         expr4 = alpha * self.gamma_w / ((1 + self.zeta) * (1 - self.gamma_w) * l_sup)
         expr5 = rho_Rx / ((1 + self.zeta) * l_sup)
 
+
         # Compute the minimum of the three expressions
         C0 = torch.min(torch.min(expr3, expr4), expr5)
 
 
         L_inf = (1+self.zeta)*C0*l_sup
-        L_w_prev = torch.max(L_inf,lipschitz(C_old,rho_Rx))
+        L_w_prev = torch.max(L_inf,lipschitz(C_i_1,rho_Rx))
         L_w = torch.max(L_inf,lipschitz(C,rho_Rx))
 
         c_w = self.gamma_w/L_w
         beta_w = (1-self.gamma_w)*torch.sqrt(C0*self.nu*(1-self.nu)*L_w_prev/L_w)
+        
 
         c_c = self.gamma_c/alpha
         beta_c = torch.sqrt(C0 * self.nu*(1-self.nu))
 
         return c_w,beta_w,c_c,beta_c
 
-    def forward(self,Rx,W,C,C_old):
+    def forward(self,Rx,W,W_j_1,C,C_j_1,C_i_1):
         """
         Computes the next iterate, output of the layer.
         Parameters
@@ -232,12 +231,14 @@ class Block(nn.Module):
         """
 
 
-        alpha = self.NN_alpha(W,C)
-        c_w,beta_w,c_c,beta_c = self.get_coefficients(Rx,alpha,C,C_old)
+        #alpha = self.NN_alpha(W,C)
+        alpha = torch.tensor(1.0,requires_grad=True)
+        #print("alpha",alpha)
+        c_w,beta_w,c_c,beta_c = self.get_coefficients(Rx,alpha,C,C_i_1)
 
-        W_updated = self.W_iter(Rx,W,C,c_w,beta_w)
-        C_updated,C_old = self.C_iter(Rx,C,W_updated,c_c,beta_c,alpha,self.eps)
-        return W_updated,C_updated,C_old
+        W_updated,W_j_1 = self.W_iter(Rx,W,W_j_1,C,c_w,beta_w)
+        C_updated,C_j_1,C_i_1= self.C_iter(Rx,C,C_j_1,W_updated,c_c,beta_c,alpha,self.eps)
+        return W_updated, W_j_1, C_updated,  C_j_1, C_i_1
 
 
 
@@ -273,7 +274,7 @@ class myModel(nn.Module):
                     p.grad          = None
 
 
-    def forward(self,Rx,W,C,mode,layer=0):
+    def forward(self,Rx,W,C,A,mode,layer=0):
         """
         Computes the next iterate, output of the model.
         Parameters
@@ -291,12 +292,15 @@ class myModel(nn.Module):
         if mode=='first_layer' or mode=='greedy':
             C_old = C.clone()
             W,C,C_old = self.Layers[layer](Rx,W,C,C_old)
+
         elif mode=='test':
+            W_j_1 = W.clone()
+            C_i_1 = C.clone()
+            C_j_1 = C.clone()
             for i in range(len(self.Layers)):
                 # we use .detach() to avoid computing and storing the gradients since the model is being tested
-                C_old = C.clone()
-                W,C,C_old = self.Layers[i](Rx,W,C,C_old)
-
+                W,W_j_1,C,C_j_1,C_i_1 = self.Layers[i](Rx,W,W_j_1,C,C_j_1,C_i_1)
+                print("ISI Score Layer ",i+1,": ",joint_isi(W, A))
         return W,C
     
 
@@ -305,16 +309,57 @@ class myModel(nn.Module):
 
 
 
+## Model parameters
+
+gamma_c = 1
+gamma_w = 0.99
+eps = 1e-12
+nu = 0.5
+zeta = 0.1 
 
 
+# Hyperparameters
+
+T = 10000
+K = 2
+N = 3
 
 
+lambda_1 = 0.04
+lambda_2 = 0.25
+rho_bounds_1 = [0.2,0.3]
+rho_bounds_2 = [0.6,0.7]
+rhos = [rho_bounds_1,rho_bounds_2]
+lambdas = [lambda_1,lambda_2]
+
+metaparameters_multiparam = get_metaparameters(rhos,lambdas)
+metaparameters_titles_multiparam = ['Case A','Case B','Case C','Case D']
 
 
+input_dim = N * N * K + K * K * N 
+N_updates_W = 10
+N_updates_C = 1
+num_layers = 100
+mode = 'test'
+size = 1
+
+X,A = generate_whitened_problem(T,K,N,metaparameters_multiparam[0][0],metaparameters_multiparam[0][1])
+Winit,Cinit = initialize(N,K)
+# Save X and A to a file
+print(X)
+torch.save(X, 'Unrolled-TITAN/TITAN_Unrolled/X.pt')
+torch.save(A, 'Unrolled-TITAN/TITAN_Unrolled/A.pt')
+print(X.shape)
+
+torch.save(Winit, 'Unrolled-TITAN/TITAN_Unrolled/Winit.pt')
+torch.save(Cinit, 'Unrolled-TITAN/TITAN_Unrolled/Cinit.pt')  
+
+model = myModel(input_dim, N_updates_W, N_updates_C, num_layers=num_layers, gamma_c=gamma_c, gamma_w=gamma_w, eps=eps, nu=nu, zeta=zeta).cuda()
+Rx = cov_X(X)
 
 
-
-
+W_predicted,_ = model(Rx,Winit,Cinit,A,mode)
+print("W_predicted :\n",W_predicted)
 
 """
 
