@@ -46,7 +46,7 @@ from joblib import Parallel, delayed
 
 from tqdm import tqdm
 
-from .iva_g import iva_g
+from .iva_g_numpy import iva_g
 from .iva_l_sos import iva_l_sos
 from .helpers_iva import _bss_isi
 

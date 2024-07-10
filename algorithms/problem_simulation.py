@@ -1,12 +1,7 @@
 import numpy as np
+import torch
 from random import *
-import matplotlib.pyplot as plt
-from tqdm import tqdm
-from time import time
-from iva_g import iva_g
-from helpers_iva import whiten_data
-from titan_iva_g_algebra_toolbox import *
-import cProfile
+from .algebra_toolbox_numpy import *
 
 
 def make_A(K,N,seed=None):
@@ -54,16 +49,6 @@ def make_X(S,A):
     X = np.einsum('MNK,NTK -> MTK',A,S)
     return X
 
-def generate_whitened_problem(T,K,N,epsilon=1,rho_bounds=[0.4,0.6],lambda_=0.25): #, idx_W=None):
-    A = make_A(K,N)
-    # A = full_to_blocks(A,idx_W,K)
-    Sigma = make_Sigma(K,N,rank=K+10,epsilon=epsilon,rho_bounds=rho_bounds,lambda_=lambda_,seed=None,normalize=False)
-    S = make_S(Sigma,T)
-    X = make_X(S,A)
-    X_,U = whiten_data(X)
-    A_ = np.einsum('nNk,Nvk->nvk',U,A)
-    return X_,A_
-
 def identifiability_level(Sigma):
     K,_,N = Sigma.shape
     res = np.inf
@@ -97,34 +82,11 @@ def create_clusters_W(K,N):
         Idx_W.append(Idx_Wk)
     return Idx_W
 
-
-K = 10
-N = 10
-Sigma = make_Sigma(K,N,rank=K+10)
-A = make_A()
-
-
-# print('identifiability = ',identifiability_level(Sigma))
-
-# epsilon = 0.01
-# Sigma0 = make_Sigma_2(K,N,rank=K+10,mu=[0.4,0.6],lambda_=0.25)
-# ident = np.zeros(99)
-# for i in range(99):
-#     Sigma = np.zeros((K,K,N))
-#     Sigma[:,:,0] = Sigma0[:,:,0]
-#     for n in range(1,N):
-#         Sigma[:,:,n] = (1-(i+1)*epsilon)*Sigma0[:,:,0] + (i+1)*epsilon*Sigma0[:,:,n]
-#     # Sigma = make_Sigma_3(K,N,rank=K+10,epsilon = i*0.1)
-#     # print('i =',i,'identifiability = ',identifiability_level(Sigma))
-#     ident[i] = identifiability_level(Sigma)
-# fig,ax = plt.subplots()
-# plt.suptitle('How identifiability relates to epsilon')
-# plt.plot(np.linspace(epsilon,99*epsilon,99),ident)
-# plt.xlabel('epsilon')
-# plt.ylabel('identifiability')
-# ax.set_yscale('log')
-# ax.set_xscale('log')
-# plt.show()
+# -----------------------------------------------------------------------------------------------------------------
+# K = 10
+# N = 10
+# Sigma = make_Sigma(K,N,rank=K+10)
+# A = make_A()
 
 
 

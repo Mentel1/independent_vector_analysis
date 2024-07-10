@@ -42,11 +42,11 @@ import numpy as np
 import scipy as sc
 import time
 
-from helpers_iva import _normalize_column_vectors, _decouple_trick, _bss_isi, whiten_data, \
-    _resort_scvs
-from initializations import _jbss_sos, _cca
+from .helpers_iva import  _decouple_trick_numpy, _bss_isi, whiten_data_numpy, \
+    _resort_scvs_numpy
+from .initializations import _jbss_sos, _cca
 
-def iva_g(X, opt_approach='newton', complex_valued=False, circular=False, whiten=True,
+def iva_g_numpy(X, opt_approach='newton', complex_valued=False, circular=False, whiten=True,
           verbose=False, A=None, W_init=None, jdiag_initW=False, max_iter=1024,
           W_diff_stop=1e-6, alpha0=1.0, return_W_change=False):
     """
@@ -190,7 +190,7 @@ def iva_g(X, opt_approach='newton', complex_valued=False, circular=False, whiten
         whiten = True
 
     if whiten:
-        X, V = whiten_data(X)
+        X, V = whiten_data_numpy(X)
 
     # calculate cross-covariance matrices of X
     R_xx = np.zeros((N, N, K, K), dtype=X.dtype)
@@ -347,7 +347,7 @@ def iva_g(X, opt_approach='newton', complex_valued=False, circular=False, whiten
             else:
                 Sigma_inv = np.linalg.inv(Sigma_n)
 
-            hnk, Q, R = _decouple_trick(W, n, Q, R)
+            hnk, Q, R = _decouple_trick_numpy(W, n, Q, R)
 
             # Loop over each dataset
             for k in range(K):
@@ -367,11 +367,11 @@ def iva_g(X, opt_approach='newton', complex_valued=False, circular=False, whiten
                 if opt_approach == 'gradient' or (opt_approach == 'quasi' and not complex_valued):
                     wnk = np.conj(W[n, :, k])
                     if opt_approach == 'gradient':
-                        grad_norm = _normalize_column_vectors(grad[:, k])
-                        grad_norm_proj = _normalize_column_vectors(grad_norm - np.conj(
+                        grad_norm = grad[:,k]/np.linalg.norm(grad[:,k]) 
+                        grad_norm_proj = (grad_norm - np.conj(
+                            wnk) @ grad_norm * wnk)/np.linalg.norm(grad_norm - np.conj(
                             wnk) @ grad_norm * wnk)  # non-colinear direction normalized
-                        W[n, :, k] = np.conj(
-                            _normalize_column_vectors(wnk - alpha0 * grad_norm_proj))
+                        W[n, :, k] = np.conj((wnk - alpha0 * grad_norm_proj)/np.linalg.norm(wnk - alpha0 * grad_norm_proj))
 
                         for kk in range(K):  # = 1/T * Y_n @ np.conj(Yn.T)
                             Sigma_n[k, kk] = W[n, :, k] @ R_xx[:, :, k, kk] @ np.conj(W[n, :, kk].T)
@@ -395,7 +395,7 @@ def iva_g(X, opt_approach='newton', complex_valued=False, circular=False, whiten
                                 Sigma_inv[k, k] + 1 / (hnk[:, k] @ wnk) ** 2))
 
                         # Block-Newton update of Wnk
-                        W[n, :, k] = _normalize_column_vectors(wnk - alpha0 * (H_inv @ grad[:, k]))
+                        W[n, :, k] = (wnk - alpha0 * (H_inv @ grad[:, k]))/np.linalg.norm(wnk - alpha0 * (H_inv @ grad[:, k]))
 
             if opt_approach == 'newton' or (opt_approach == 'quasi' and complex_valued):
                 # Compute SCV Hessian
@@ -449,7 +449,7 @@ def iva_g(X, opt_approach='newton', complex_valued=False, circular=False, whiten
                 # Store Updated W
                 Wn = np.reshape(Wn, (N, K), 'F')
                 for k in range(K):
-                    W[n, :, k] = _normalize_column_vectors(Wn[:, k])
+                    W[n, :, k] = Wn[:, k]/np.linalg.norm(Wn[:,k])
 
         for k in range(K):
             if complex_valued:  # for complex data, W_old @ W.T is not bounded between -1 and 1
@@ -516,7 +516,7 @@ def iva_g(X, opt_approach='newton', complex_valued=False, circular=False, whiten
         P_xx = None
     if not whiten:
         V = None
-    W, Sigma_N = _resort_scvs(W, R_xx, whiten, V, complex_valued, circular, P_xx)
+    W, Sigma_N = _resort_scvs_numpy(W, R_xx, whiten, V, complex_valued, circular, P_xx)
 
     end = time.time()
 

@@ -3,28 +3,22 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 import openpyxl
 from time import time
-from iva_g import iva_g
-from helpers_iva import whiten_data
-import cProfile
-from titan_iva_g_problem_simulation import *
-from titan_iva_g_reg import *
-from titan_iva_g_lab import *
-
-
+from iva_g_numpy import iva_g_numpy 
+from helpers_iva import whiten_data_numpy
+from titan_iva_g_reg_numpy import *
+from problem_simulation import *
 
 def search_criteria(algo='palm_iva_g_reg',K=5,N=3,T=10000,max_iter=5000,criteria_max=10**(-10),rhos=[0.4,0.6],lambda_=0.1,gamma_c=1.9,gamma_w=0.9,alpha=10,seed=1):
     Sigma = make_Sigma(K,N,rank=K+10,mu=rhos,lambda_=lambda_,seed=999,normalize=False)
     S = make_S(Sigma,T)
     A = make_A(K,N)
     X = make_X(S,A)
-    X_,U = whiten_data(X)
+    X_,U = whiten_data_numpy(X)
     A_ = np.einsum('nNk, Nvk-> nvk', U, A)
-    if algo == 'palm_iva_g_reg':
-        _,_,_,isi,diffs = palm_iva_g_reg(X_,alpha=alpha,max_iter=max_iter,criteria=criteria_max,track_isi=True,track_diff=True,B=A_,seed=seed,update_scheme=(1,5),gamma_w=gamma_w,gamma_c=gamma_c,inertial=False)
-    elif algo == 'newton':
-        _,_,_,isi,diffs = iva_g(X_,opt_approach='newton',A=A_,max_iter=max_iter,W_diff_stop=criteria_max,return_W_change=True)
+    if algo == 'newton':
+        _,_,_,isi,diffs = iva_g_numpy(X_,opt_approach='newton',A=A_,max_iter=max_iter,W_diff_stop=criteria_max,return_W_change=True)
     elif algo == 'gradient':
-        _,_,_,isi,diffs = iva_g(X_,opt_approach='gradient',A=A_,max_iter=max_iter,W_diff_stop=criteria_max,return_W_change=True)
+        _,_,_,isi,diffs = iva_g_numpy(X_,opt_approach='gradient',A=A_,max_iter=max_iter,W_diff_stop=criteria_max,return_W_change=True)
     else:
         raise('You must provide one of the following algorithms : palm_iva_g_reg, newton or gradient')
     # diffs_max = []
@@ -65,10 +59,10 @@ def compare_diffs(N_exp=1,K=5,N=3,T=10000,rhos=[0.6,0.7],lambda_=0.04,max_iter=2
         S = make_S(Sigma,T)
         A = make_A(K,N)
         X = make_X(S,A)
-        X_,U = whiten_data(X)
+        X_,U = whiten_data_numpy(X)
         A_ = np.einsum('nNk, Nvk-> nvk',U,A)
-        _,_,_,_,diffs = palm_iva_g_reg(X_,gamma_c=gamma_c,gamma_w=gamma_w,alpha=alpha,max_iter=max_iter,criteria=criteria,B=A_,track_diff=True,seed=seed)
-        # _,_,_,_,diffs = titan_palm_iva_g_reg(X_,gamma_c=1,gamma_w=gamma_w,alpha=alpha,max_iter=max_iter,criteria=criteria,track_diff=True,seed=seed)
+        # _,_,_,_,diffs = palm_iva_g_reg(X_,gamma_c=gamma_c,gamma_w=gamma_w,alpha=alpha,max_iter=max_iter,criteria=criteria,B=A_,track_diff=True,seed=seed)
+        _,_,_,_,diffs = titan_iva_g_reg_numpy(X_,gamma_c=1,gamma_w=gamma_w,alpha=alpha,max_iter=max_iter,criteria=criteria,track_diff=True,seed=seed)
         diffs_W,diffs_C = diffs
         fig,ax1 = plt.subplots()
         ax1.set_title('evolution of the criterias with repect to W (blue) and C (red). K = {}, N = {}'.format(K,N),fontsize=16,y=1.05,x=0.5)
@@ -93,10 +87,10 @@ def cost_evolution(N_exp=1,K=5,N=3,T=10000,rhos=[0.6,0.7],lambda_=0.04,max_iter=
         S = make_S(Sigma,T)
         A = make_A(K,N)
         X = make_X(S,A)
-        X_,U = whiten_data(X)
+        X_,U = whiten_data_numpy(X)
         A_ = np.einsum('nNk, Nvk-> nvk',U,A)
         # _,_,_,cost,_,_ = palm_iva_g_reg(X_,gamma_c=gamma_c,gamma_w=gamma_w,alpha=alpha,max_iter=max_iter,criteria=criteria,B=A_,track_diff=True,seed=seed)
-        _,_,_,cost = titan_iva_g_reg(X_,gamma_c=1,gamma_w=gamma_w,alpha=alpha,max_iter=max_iter,update_scheme=(20,1),criteria=criteria,B=A_,track_cost=True,seed=seed)
+        _,_,_,cost = titan_iva_g_reg_numpy(X_,gamma_c=1,gamma_w=gamma_w,alpha=alpha,max_iter=max_iter,update_scheme=(20,1),criteria=criteria,B=A_,track_cost=True,seed=seed)
         cost_W = []
         cost_C = []
         for i in range(len(cost)//2):
@@ -131,7 +125,7 @@ def search_alphas_and_criterias(K=5,N=5,T=10000,max_iter=20000,criteria_max=10**
     S = make_S(Sigma,T)
     A = make_A(K,N)
     X = make_X(S,A)
-    X_,U = whiten_data(X)
+    X_,U = whiten_data_numpy(X)
     A_ = np.einsum('nNk, Nvk-> nvk', U, A)
     fig,ax1 = plt.subplots()
     for alpha in alphas:

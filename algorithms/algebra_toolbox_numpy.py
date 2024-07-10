@@ -1,30 +1,19 @@
 import numpy as np
-import matplotlib.pyplot as plt
-from tqdm import tqdm
-from time import time
-from iva_g import iva_g
-from helpers_iva import whiten_data
 from concurrent.futures import ThreadPoolExecutor
-import cProfile
 
-
-def sym(A):
+def sym_numpy(A):
     if A.ndim == 2:
         return (A.T+A)/2
     else:
         return (A + np.moveaxis(A,0,1))/2
 
-def cov_X(X):
-    _,T,_ = X.shape
-    return np.einsum('NTK,MTJ->KJNM',X,X)/T
-
-def spectral_norm(M):
+def spectral_norm_numpy(M):
     if M.ndim == 2:
         return np.linalg.norm(M,ord=2)
     else:
         return np.max(np.linalg.norm(M,ord=2,axis=(0,1)))
     
-def spectral_norm_extracted(Rx,K,N):
+def spectral_norm_extracted_numpy(Rx,K,N):
     return np.max(np.linalg.norm(np.reshape(np.moveaxis(Rx,1,0),(K,K*N,N)),ord=2,axis=(1,2)))
 
 def smallest_singular_value(C):
@@ -66,10 +55,10 @@ def full_to_blocks( W_full,idx_W,K):
 
 #     return W_bd
 
-def lipschitz(C,lam):
-    return spectral_norm(C)*lam
+def lipschitz_numpy(C,lam):
+    return spectral_norm_numpy(C)*lam
 
-def joint_isi(W,A):
+def joint_isi_numpy(W,A):
     N,_,_ = W.shape
     G_bar = np.sum(np.abs(np.einsum('nNk, Nvk -> nvk',W,A)),axis=2)
     score = (np.sum(np.sum(G_bar/np.max(G_bar,axis=0),axis=0)-1) + np.sum(np.sum(G_bar.T/np.max(G_bar.T,axis=0),axis=0)-1))
@@ -88,7 +77,7 @@ def decrease(cost,verbose=0):
                     break
         return False
     
-def diff_criteria(A,B,mode='full'):
+def diff_criteria_numpy(A,B,mode='full'):
     
 # calculates the distance between two tensors or matrices A and B taking into account the scaling ambiguity
     N = A.shape[0]

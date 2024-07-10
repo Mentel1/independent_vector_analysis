@@ -1,20 +1,23 @@
 import os
 from datetime import datetime
 import numpy as np
-import pandas as pd
-import reportlab as rl
 import matplotlib.pyplot as plt
 import matplotlib as mpl
-from tqdm import tqdm
 from time import time
-from iva_g import iva_g
-from helpers_iva import whiten_data
-import cProfile
-from titan_iva_g_algebra_toolbox import *
-from titan_iva_g_problem_simulation import *
-from titan_iva_g_reg import *
-from titan_iva_g_class_algos import *
+from algorithms.problem_simulation import *
+
+from class_algos import *
    
+def generate_whitened_problem(T,K,N,epsilon=1,rho_bounds=[0.4,0.6],lambda_=0.25): #, idx_W=None):
+    A = make_A(K,N)
+    # A = full_to_blocks(A,idx_W,K)
+    Sigma = make_Sigma(K,N,rank=K+10,epsilon=epsilon,rho_bounds=rho_bounds,lambda_=lambda_,seed=None,normalize=False)
+    S = make_S(Sigma,T)
+    X = make_X(S,A)
+    X_,U = whiten_data_numpy(X)
+    A_ = np.einsum('nNk,Nvk->nvk',U,A)
+    return X_,A_
+
 class ComparisonExperimentIvaG:
 #On classe les résultats et les graphes dans une arborescence de 2 niveaux :
 #un premier niveau de meta-paramètres qui dépendent du mode d'expérience 
@@ -56,7 +59,7 @@ class ComparisonExperimentIvaG:
          
     def get_data_from_folder(self,date):
         self.date = date
-        foldername = self.date + ' ' + self.name
+        foldername = 'Result_data/' + self.date + ' ' + self.name
         Ks,Ns = self.common_parameters
         dimensions = (len(self.meta_parameters),len(Ks),len(Ns),self.N_exp)
         for algo in self.algos:
@@ -77,7 +80,7 @@ class ComparisonExperimentIvaG:
         return best_perfs
    
     def make_table(self,tols=(1e-4,1e-2)):
-        output_folder = self.date + ' ' + self.name   
+        output_folder = 'Result_data/' + self.date + ' ' + self.name   
         Ks,Ns = self.common_parameters
         n_cols = len(Ks)*len(Ns)
         best_results = self.best_perf(criterion='results')
@@ -150,7 +153,7 @@ class ComparisonExperimentIvaG:
             file.write('\\end{tabular}\n\\end{table}')
 
     def make_charts(self,full=False):
-        output_folder = self.date + ' ' + self.name
+        output_folder = 'Result_data/' + self.date + ' ' + self.name
         Ks,Ns = self.common_parameters
         for a,metaparam in enumerate(self.meta_parameters):
             for ik,K in enumerate(Ks):
@@ -199,7 +202,7 @@ class ComparisonExperimentIvaG:
                 plt.close(fig)
                                           
     def store_in_folder(self):
-        output_folder = self.date + ' ' + self.name
+        output_folder = 'Result_data/' + self.date + ' ' + self.name
         os.makedirs(output_folder,exist_ok=True)
         Ks,Ns = self.common_parameters
         for a,metaparam in enumerate(self.meta_parameters):

@@ -45,7 +45,7 @@ import time
 from .helpers_iva import _normalize_column_vectors, whiten_data, _bss_isi, _decouple_trick, \
     _comp_l_sos_cost, _resort_scvs
 from .initializations import _jbss_sos, _cca
-from .iva_g import iva_g
+from .iva_g_numpy import iva_g
 
 
 def iva_l_sos(X, whiten=True, grad_projection=False, verbose=False, A=None, W_init=None,

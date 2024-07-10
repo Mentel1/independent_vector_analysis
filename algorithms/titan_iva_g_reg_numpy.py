@@ -1,14 +1,8 @@
 import numpy as np
-import matplotlib.pyplot as plt
-from tqdm import tqdm
 from time import time
-from iva_g import iva_g
-from helpers_iva import whiten_data
-from initializations import _jbss_sos, _cca
-import cProfile
-from titan_iva_g_algebra_toolbox import *
-from titan_iva_g_problem_simulation import *
-from titan_iva_g_lab import *
+from .initializations import _jbss_sos, _cca
+from .algebra_toolbox_numpy import *
+from .problem_simulation import *
 import dask as dk
 
 def cost_iva_g_reg(W,C,Rx,alpha):
@@ -45,11 +39,11 @@ def prox_g(C,c_c,eps):
     # s_new = (s + np.sqrt(s**2+2*c_c))/2
     C_new = np.einsum('nNv,nvM -> nNM',U*s_new[:,np.newaxis],Vh)
     C_new = np.moveaxis(C_new,0,2)
-    return sym(C_new)
+    return sym_numpy(C_new)
 
 def grad_H_C_reg(W,C,Rx,alpha):
     _,_,K = W.shape
-    grad = sym(np.einsum('nNK, KJNM, nMJ -> KJn',W,Rx,W))/2
+    grad = sym_numpy(np.einsum('nNK, KJNM, nMJ -> KJn',W,Rx,W))/2
     grad[np.arange(K), np.arange(K), :] += alpha * (C[np.arange(K), np.arange(K), :] - 1) 
     return grad
 
@@ -59,9 +53,9 @@ def palm_iva_g_reg(X,alpha=1,gamma_c=1.99,gamma_w=0.99,max_iter=5000,
                    seed=None,track_jisi=False,track_diff=False,B=None,adaptative_gamma_w=False,
                    gamma_w_decay=0.9):
     alpha, gamma_c, gamma_w = to_float64(alpha, gamma_c, gamma_w)
-    N,_,K = X.shape
-    Lambda = cov_X(X)
-    lam = spectral_norm_extracted(Lambda,K,N)
+    N,T,K = X.shape
+    Lambda = np.einsum('NTK,MTJ->KJNM',X,X)/T
+    lam = spectral_norm_extracted_numpy(Lambda,K,N)
     if (not adaptative_gamma_w) and gamma_w > 1:
         raise('gamma_w must be in (0,1) if not adaptative')
     if adaptative_gamma_w:
@@ -77,21 +71,21 @@ def palm_iva_g_reg(X,alpha=1,gamma_c=1.99,gamma_w=0.99,max_iter=5000,
         if np.any(B == None):
             raise("you must provide B to track jISI")
         else:
-            jISI = [joint_isi(W,B)]
-    diff_ext = np.infty
+            jISI = [joint_isi_numpy(W,B)]
+    diff_ext = np.inf
     # N_updates_W, N_updates_C = update_scheme
     while diff_ext > crit_ext and N_step < max_iter:
-        diff_int = np.infty
+        diff_int = np.inf
         # for uw in range(N_updates_W):
         N_step_int = 0
         W_old0 = W.copy()
         while diff_int > crit_int and N_step_int < max_iter_int:
             W_old = W.copy()
-            c_w = gamma_w/max(eps,lipschitz(C,lam))
+            c_w = gamma_w/max(eps,lipschitz_numpy(C,lam))
             grad_W = grad_H_W(W,C,Lambda)
             W = W - c_w*grad_W
             W = prox_f(W,c_w)
-            diff_int = diff_criteria(W,W_old)
+            diff_int = diff_criteria_numpy(W,W_old)
             N_step_int += 1
             # if diff_criteria(W,W_old) < W_diff_stop:
             #     return report_variables(W,C,N_step,max_iter,cost,jISI,diffs_W,diffs_C,track_diff,track_cost,track_jisi)
@@ -108,36 +102,36 @@ def palm_iva_g_reg(X,alpha=1,gamma_c=1.99,gamma_w=0.99,max_iter=5000,
         grad_C = grad_H_C_reg(W,C,Lambda,alpha)
         C = C - c_c*grad_C
         C = prox_g(C,c_c,eps)
-        diff_ext = max(diff_criteria(C,C_old),diff_criteria(W,W_old0))
+        diff_ext = max(diff_criteria_numpy(C,C_old),diff_criteria_numpy(W,W_old0))
         if track_cost:
             cost.append(cost_iva_g_reg(W,C,Lambda,alpha))
         # diff_W,diff_C = diff_criteria(W,W_old),diff_criteria(C,C_old)
         # diff = max(diff_W,diff_C)
-        diff_W = diff_criteria(W,W_old)
+        diff_W = diff_criteria_numpy(W,W_old)
         if track_diff:
             # diffs_W.append(diff_criteria(W,W_old))
             diffs_W.append(diff_W)
             # diffs_C.append(diff_C)
         if track_jisi:
-            jISI.append(joint_isi(W,B))
+            jISI.append(joint_isi_numpy(W,B))
         N_step += 1
     # if adaptative_gamma_w:
     #     print(overhead)
     return report_variables(W,C,N_step,max_iter,cost,jISI,diffs_W,diffs_C,track_diff,track_cost,track_jisi)
 
-def titan_iva_g_reg(X,alpha=1,gamma_c=1,gamma_w=0.99,max_iter=20000,
+def titan_iva_g_reg_numpy(X,alpha=1,gamma_c=1,gamma_w=0.99,max_iter=20000,
                          max_iter_int=100,crit_int=1e-10,crit_ext=1e-10,init_method='random',
                          Winit=None,Cinit=None,
                          eps=10**(-12),track_cost=False,seed=None,
                          track_jisi=False,track_diff=False,B=None,nu=0.5,zeta=1e-3,
                          max_iter_int_C=1,adaptative_gamma_w=False,
                          gamma_w_decay=0.9):
-    N,_,K = X.shape
+    N,T,K = X.shape
     alpha, gamma_c, gamma_w = to_float64(alpha, gamma_c, gamma_w)
     # if (not adaptative_gamma_w) and gamma_w > 1:
     #     raise('gamma_w must be in (0,1) if not adaptative')
-    Rx = cov_X(X)
-    rho_Rx = spectral_norm_extracted(Rx,K,N)
+    Rx = np.einsum('NTK,MTJ->KJNM',X,X)/T
+    rho_Rx = spectral_norm_extracted_numpy(Rx,K,N)
     #Empiriquement, prend des valeurs entre 1 et 3 après whitening
     W,C = initialize(N,K,init_method=init_method,Winit=Winit,Cinit=Cinit,X=X,Rx=Rx,seed=seed)
     l_sup = max((gamma_w*alpha)/(1-gamma_w),rho_Rx*2*K*(1+np.sqrt(2/(alpha*gamma_c))))
@@ -157,9 +151,9 @@ def titan_iva_g_reg(X,alpha=1,gamma_c=1,gamma_w=0.99,max_iter=20000,
         if np.any(B == None):
             raise("you must provide B to track jISI")
         else:
-            jISI = [joint_isi(W,B)]
-    diff_ext = np.infty
-    L_w = max(l_inf,lipschitz(C,rho_Rx))
+            jISI = [joint_isi_numpy(W,B)]
+    diff_ext = np.inf
+    L_w = max(l_inf,lipschitz_numpy(C,rho_Rx))
     times = [0]
     t0 = time()
     # dW = np.zeros_like((W))
@@ -167,9 +161,9 @@ def titan_iva_g_reg(X,alpha=1,gamma_c=1,gamma_w=0.99,max_iter=20000,
     while diff_ext > crit_ext and N_step < max_iter:
         C_old0 = C.copy()
         L_w_prev = L_w
-        L_w = max(l_inf,lipschitz(C,rho_Rx)) #Empiriquement le module de Lipschitz semble prendre des valeurs entre 1 et 20 dans nos exemples       
-        diff_int = np.infty
-        diff_int_C = np.infty #here
+        L_w = max(l_inf,lipschitz_numpy(C,rho_Rx)) #Empiriquement le module de Lipschitz semble prendre des valeurs entre 1 et 20 dans nos exemples       
+        diff_int = np.inf
+        diff_int_C = np.inf #here
         W_old0 = W.copy()
         N_step_int_W = 0
         N_step_int_C = 0 #here
@@ -185,7 +179,7 @@ def titan_iva_g_reg(X,alpha=1,gamma_c=1,gamma_w=0.99,max_iter=20000,
             W_lat = W_tilde - c_w*grad_W
             W_prev = W.copy()
             W = prox_f(W_lat,c_w)
-            diff_int = diff_criteria(W,W_prev)
+            diff_int = diff_criteria_numpy(W,W_prev)
             N_step_int_W += 1
             # dW_prev = dW.copy()
             # dW = W - W_prev
@@ -212,9 +206,9 @@ def titan_iva_g_reg(X,alpha=1,gamma_c=1,gamma_w=0.99,max_iter=20000,
             C_lat = C_tilde - c_c*grad_C
             C_prev = C.copy()
             C = prox_g(C_lat,c_c,eps)
-            diff_int = diff_criteria(C,C_prev) #here
+            diff_int = diff_criteria_numpy(C,C_prev) #here
             N_step_int_C += 1 #here
-        diff_ext = max(diff_criteria(C,C_old0),diff_criteria(W,W_old0))
+        diff_ext = max(diff_criteria_numpy(C,C_old0),diff_criteria_numpy(W,W_old0))
         if track_cost:
             cost.append(cost_iva_g_reg(W,C,Rx,alpha))
         # diff_W = diff_criteria(W,W_old)
@@ -224,9 +218,10 @@ def titan_iva_g_reg(X,alpha=1,gamma_c=1,gamma_w=0.99,max_iter=20000,
         #     diffs_W.append(diff_W)
             # diffs_C.append(diff_C)
         if track_jisi:
-            jISI.append(joint_isi(W,B))
+            jISI.append(joint_isi_numpy(W,B))
         times.append(time()-t0)
-        N_step += 1      
+        N_step += 1
+    # print(N_step)
     return report_variables(W,C,N_step,max_iter,times,cost,jISI,diffs_W,diffs_C,track_diff,track_cost,track_jisi,shifts_W)
 
 def block_titan_palm_iva_g_reg(X,idx_W,alpha=1,gamma_c=1,gamma_w=0.99,C0=0.999,nu=0.5,
@@ -234,9 +229,9 @@ def block_titan_palm_iva_g_reg(X,idx_W,alpha=1,gamma_c=1,gamma_w=0.99,C0=0.999,n
                                init_method='random',Winit=None,Cinit=None,eps=10**(-12),
                                track_cost=False,seed=None,track_jisi=False,track_diff=False,B=None):
     alpha, gamma_c, gamma_w = to_float64(alpha, gamma_c, gamma_w)
-    N,_,K = X.shape
-    Lambda = cov_X(X)
-    lam = spectral_norm_extracted(Lambda,K,N)
+    N,T,K = X.shape
+    Lambda = np.einsum('NTK,MTJ->KJNM',X,X)/T
+    lam = spectral_norm_extracted_numpy(Lambda,K,N)
     W_full, C = initialize(N,K,init_method,Winit=Winit,Cinit=Cinit,X=X,Rx=Lambda,seed=seed)
     W_blocks = full_to_blocks(W_full,idx_W,K)
     C_lat,C_bar,C_tilde,C_prev = C.copy(),C.copy(),C.copy(),C.copy()
@@ -254,15 +249,15 @@ def block_titan_palm_iva_g_reg(X,idx_W,alpha=1,gamma_c=1,gamma_w=0.99,C0=0.999,n
         if np.any(B == None):
             raise("you must provide B to track jISI")
         else:
-            jISI = [joint_isi(W_full,B)]
-    diff_ext = np.infty
-    L_w = lipschitz(C,lam)
+            jISI = [joint_isi_numpy(W_full,B)]
+    diff_ext = np.inf
+    L_w = lipschitz_numpy(C,lam)
     # N_updates_W, N_updates_C = update_scheme
     while diff_ext > crit_ext and N_step < max_iter:
         C_old = C.copy()
         L_w_prev = L_w
-        L_w = lipschitz(C,lam)
-        diff_int = np.infty
+        L_w = lipschitz_numpy(C,lam)
+        diff_int = np.inf
         W_old0 = W_blocks.copy()
         N_step_int = 0
         # for update in range(N_updates_W):
@@ -278,7 +273,7 @@ def block_titan_palm_iva_g_reg(X,idx_W,alpha=1,gamma_c=1,gamma_w=0.99,C0=0.999,n
             W_prev = W_full.copy()
             W_lat = full_to_blocks(W_lat)
             W_blocks = prox_f(W_lat,c_w,mode='blocks')
-            diff_int = diff_criteria(W_blocks,W_old)
+            diff_int = diff_criteria_numpy(W_blocks,W_old)
             W_full = blocks_to_full(W_blocks)
             N_step_int += 1
         # print(N_step_int)
@@ -293,7 +288,7 @@ def block_titan_palm_iva_g_reg(X,idx_W,alpha=1,gamma_c=1,gamma_w=0.99,C0=0.999,n
         C_lat = C_tilde - c_c*grad_C
         C_prev = C.copy()
         C = prox_g(C_lat,c_c,eps)
-        diff_ext = max(diff_criteria(C,C_old),diff_criteria(W_blocks,W_old0))
+        diff_ext = max(diff_criteria_numpy(C,C_old),diff_criteria_numpy(W_blocks,W_old0))
         if track_cost:
             cost.append(cost_iva_g_reg(W_full,C,Lambda,alpha))
         # diff_W = diff_criteria(W,W_old)
@@ -303,7 +298,7 @@ def block_titan_palm_iva_g_reg(X,idx_W,alpha=1,gamma_c=1,gamma_w=0.99,C0=0.999,n
         #     diffs_W.append(diff_W)
             # diffs_C.append(diff_C)
         if track_jisi:
-            jISI.append(joint_isi(W_full,B))
+            jISI.append(joint_isi_numpy(W_full,B))
         N_step += 1
     return report_variables(W_full,C,N_step,max_iter,cost,jISI,diffs_W,diffs_C,track_diff,track_cost,track_jisi)
 

@@ -1,21 +1,8 @@
-import os
-from datetime import datetime
-import numpy as np
-import scipy as sc
-import pandas as pd
-import reportlab as rl
 import matplotlib.pyplot as plt
 import matplotlib as mpl
-from tqdm import tqdm
-from time import time
-from iva_g import iva_g
-from helpers_iva import whiten_data
 import cProfile
-from titan_iva_g_algebra_toolbox import *
-from titan_iva_g_problem_simulation import *
-from titan_iva_g_reg import *
-from titan_iva_g_class_exp import *
-from titan_iva_g_class_algos import *
+from class_exp import *
+from class_algos import *
 #------------------------------------------------------------------------------------------------------
 
 
@@ -31,7 +18,7 @@ lambdas = [lambda_1,lambda_2]
 # identifiability_levels = [1e-2,1e-1,1])
 # identifiability_levels_names = ['low identifiability','medium identifiability','high identifiability']
 Ks = [5,10]
-Ns = [3,5,10]
+Ns = [3,5] #,10]
 
 common_parameters = [Ks,Ns]
 metaparameters_titles_multiparam = ['Case A','Case B','Case C','Case D']
@@ -53,13 +40,15 @@ plt.rcParams['text.usetex'] = True
 
 metaparameters_multiparam = get_metaparameters(rhos,lambdas)
 
-algo_titan = TitanIvaG((0,0.5,0),name='titan',gamma_w=0.99,crit_ext=1e-10,crit_int=1e-10)
-algo_iva_g_n = IvaGN((0,0,1),name='iva_g_n',crit_ext=1e-7)
-algo_iva_g_v = IvaGV((1,0,0),name='iva_g_v',crit_ext=1e-6)
+algo_titan_numpy = TitanIvaG((0,0.4,0),name='titan_numpy',gamma_w=0.99,crit_ext=1e-10,crit_int=1e-10,library='numpy')
+algo_titan_torch = TitanIvaG((0,0.8,0),name='titan_torch',gamma_w=0.99,crit_ext=1e-10,crit_int=1e-10,library='torch')
+algo_iva_g_n_numpy = IvaG((0,0,1),name='iva_g_n_numpy',crit_ext=1e-7,opt_approach='newton',library='numpy')
+algo_iva_g_n_torch = IvaG((0,1,1),name='iva_g_n_torch',crit_ext=1e-7,opt_approach='newton',library='torch')
+algo_iva_g_v_numpy = IvaG((1,0,0),name='iva_g_v_numpy',crit_ext=1e-6,opt_approach='gradient',library='numpy')
+algo_iva_g_v_torch = IvaG((1,1,0),name='iva_g_v_torch',crit_ext=1e-6,opt_approach='gradient',library='torch')
 
 
-algos = [algo_titan,algo_iva_g_v,algo_iva_g_n]
-
+algos = [algo_iva_g_n_torch,algo_iva_g_v_torch,algo_titan_numpy,algo_titan_torch,algo_iva_g_v_numpy,algo_iva_g_n_numpy]
 
 exp2 = ComparisonExperimentIvaG('multiparameter benchmark',algos,metaparameters_multiparam,metaparameters_titles_multiparam,
                                 common_parameters,'multiparam',title_fontsize=50,legend_fontsize=6,N_exp=1,charts=False,legend=False)
