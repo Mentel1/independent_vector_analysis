@@ -84,7 +84,7 @@ def get_metaparameters(rhos,lambdas):
     return metaparameters_multiparam
 
 
-class MonDataset(Dataset):
+class MyDataset(Dataset):
     def __init__(self, T, K, N, metaparameters_multiparam,size):
         self.T = T
         self.K = K
