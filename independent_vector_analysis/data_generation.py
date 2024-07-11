@@ -106,7 +106,7 @@ def generate_sources(rho, N, T, K):
 
 def MGGD_generation(N, dim=None, correlation_structure=None, rho=None, beta=1, cov=None):
     """
-    Contains six functions that can be used to generate multivariate generalized Gaussian
+    Contains different functions that can be used to generate multivariate generalized Gaussian
     distributed (MGGD) sources. If cov is given, none of the functions will be used but data will
     be generated using cov.
     
@@ -128,6 +128,8 @@ def MGGD_generation(N, dim=None, correlation_structure=None, rho=None, beta=1, c
             - 'rho_list': elements of each row/column of the covariance matrix have a specific value
             - 'block': block-diagonal matrix. Elements in a block have same value, non
                        block-elements have same value, diagonal elements are 1
+            - 'noisy_block': block-diagonal matrix. Elements in a block have same value + noise ~N(0,0.01),
+                       non block-elements have same value, diagonal elements are 1
         
     rho : float or dict or np.ndarray or list, optional
         Correlation value. Must be given if cov is None and correlation_structure is not 'q_qt'.
@@ -136,7 +138,7 @@ def MGGD_generation(N, dim=None, correlation_structure=None, rho=None, beta=1, c
             basic correlation.
             'idx' is a np.ndarray or list that gives the specific locations where 'val[1]' is set.
         If correlation_structure=='rho_list', rho must be a np.ndarray or list with length dim-1.
-        If correlation_structure=='block', rho is a dict with keys 'blocks' and 'val'.
+        If correlation_structure=='block' or 'noisy_block', rho is a dict with keys 'blocks' and 'val'.
             - rho['blocks'] must be tuple or list of tuples, where each tuple contains
               (correlation value of the block, start idx of the block, length of the blocks).
             - rho['val'] is the correlation value of the non-block elements.
@@ -237,7 +239,7 @@ def MGGD_generation(N, dim=None, correlation_structure=None, rho=None, beta=1, c
 
     if cov is None:
         # This is the covariance matrix of X
-        cov = np.abs(_create_covariance_matrix(dim, correlation_structure, rho))
+        cov = _create_covariance_matrix(dim, correlation_structure, rho)
 
         # make sure randomly generated cov is positive semidefinite. If not, regenerate
         flag = 0
@@ -246,7 +248,7 @@ def MGGD_generation(N, dim=None, correlation_structure=None, rho=None, beta=1, c
                 np.linalg.cholesky(cov)
                 flag = 1
             except:
-                cov = np.abs(_create_covariance_matrix(dim, correlation_structure, rho))
+                cov = _create_covariance_matrix(dim, correlation_structure, rho)
 
     u = _random_sphere(N, dim).T  # u^(n) in (3)
 
@@ -266,7 +268,7 @@ def MGGD_generation(N, dim=None, correlation_structure=None, rho=None, beta=1, c
 
 def _create_covariance_matrix(dim, correlation_structure, rho):
     if correlation_structure == 'uniform':
-        Sigma = np.full((dim, dim), rho)
+        Sigma = np.full((dim, dim), rho, dtype=float)
         np.fill_diagonal(Sigma, 1)
 
     elif correlation_structure == 'ar':
@@ -280,7 +282,7 @@ def _create_covariance_matrix(dim, correlation_structure, rho):
         Sigma = R @ R.T
 
     elif correlation_structure == 'two_rho':
-        Sigma = np.full((dim, dim), rho['val'][0])
+        Sigma = np.full((dim, dim), rho['val'][0], dtype=float)
         for i in rho['idx']:
             for j in rho['idx']:
                 Sigma[i, j] = rho['val'][1]
@@ -306,14 +308,41 @@ def _create_covariance_matrix(dim, correlation_structure, rho):
         else:
             csl = rho['blocks']
 
-        Sigma = np.full((dim, dim), rho['val'])
+        Sigma = np.full((dim, dim), rho['val'], dtype=float)
         for (correlation, start, length) in csl:
             Sigma[start:start + length, start:start + length] = correlation
         np.fill_diagonal(Sigma, 1)
 
+    elif correlation_structure == 'noisy_block':
+        if type(rho['blocks']) is tuple:
+            csl = [rho['blocks']]
+        else:
+            csl = rho['blocks']
+
+        Sigma = np.full((dim, dim), rho['val'], dtype=float)
+        for (correlation, start, length) in csl:
+            Sigma[start:start + length, start:start + length] = correlation
+            # add noise to blocks
+            for i in range(start, start + length):
+                for j in range(i + 1, start + length):
+                    noise = np.random.randn(1) * 0.05
+                    Sigma[i, j] += noise
+                    Sigma[j, i] += noise
+        np.fill_diagonal(Sigma, 1)
+
     else:
         raise AssertionError("'correlation_structure' must be 'uniform', 'ar', 'q_qt', "
-                             "'two_rho', 'rho_list', or 'block'.")
+                             "'two_rho', 'rho_list', 'block' or 'noisy_block'.")
+
+    # make sure covariance matrix is positive-semidefinite. If not, regenerate
+    flag = 0
+    while flag == 0:
+        try:
+            np.linalg.cholesky(Sigma)
+            flag = 1
+        except:
+            print('regenerate Sigma')
+            Sigma = _create_covariance_matrix(dim, correlation_structure, rho)
 
     return Sigma
 
