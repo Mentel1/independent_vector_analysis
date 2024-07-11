@@ -1,6 +1,6 @@
 import torch
 import torch.optim as optim
-from model import myModel, ISI_loss
+from model import *
 from data import *
 from tools import *
 from functions import *
@@ -37,28 +37,20 @@ def print_gradients(module, grad_input, grad_output):
 # After training, you can access the trained model parameters, including the optimized alpha values, using model.parameters().
 
 
-
-
-
-
-
-
-
-
 ## Model parameters
 
 gamma_c = 1
 gamma_w = 0.99
 eps = 1e-12
 nu = 0.5
-zeta = 0.1 
+zeta = 1e-3 
 
 
 # Hyperparameters
 
 T = 10000
-K = 2
-N = 3
+K = 5
+N = 5
 
 lambda_1 = 0.04
 lambda_2 = 0.25
@@ -71,14 +63,16 @@ metaparameters_multiparam = get_metaparameters(rhos,lambdas)
 metaparameters_titles_multiparam = ['Case A','Case B','Case C','Case D']
 
 
-input_dim = N * N * K + K * K * N 
+input_dim = N * N * K + K * K * N
 N_updates_W = 10
 N_updates_C = 1
-dataset_size = 1
-learning_rate = 1e-4
+dataset_size = 100
+learning_rate = 1e-2
 num_epochs = 1
-batch_size = 1
-num_layers = 100
+batch_size = 4
+num_layers = 300
+
+
 
 
 
@@ -88,7 +82,7 @@ class U_TITAN(nn.Module):
 
     """
 
-    def __init__(self, mode='greedy', T=T, K=K, N=N, metaparameters_multiparam=metaparameters_multiparam, size = dataset_size, input_dim = input_dim,
+    def __init__(self, folders, mode='end-to-end', T=T, K=K, N=N, metaparameters_multiparam=metaparameters_multiparam, size = dataset_size, input_dim = input_dim,
                     lr = learning_rate, N_updates_W = N_updates_W,N_updates_C = N_updates_C ,num_epochs = num_epochs, batch_size = batch_size, num_layers=num_layers, gamma_c=gamma_c, gamma_w=gamma_w, eps=eps, nu=nu, zeta=zeta):
             """
             Parameters
@@ -119,7 +113,7 @@ class U_TITAN(nn.Module):
             self.input_dim = input_dim
             self.metaparameters_multiparam = metaparameters_multiparam
             self.dataset_size = size
-            #self.path_test, self.path_train, self.path_save = folders
+            self.path_test, self.path_train, self.path_save = folders
             self.mode  = mode #'first_layer' or 'greedy' or 'last_layers_lpp' or 'test'
             # training information
             self.lr = lr
@@ -127,7 +121,7 @@ class U_TITAN(nn.Module):
             self.num_layers = num_layers
             self.batch_size = batch_size 
             self.dtype = torch.cuda.FloatTensor
-            self.model = myModel(input_dim, N_updates_W, N_updates_C, num_layers=num_layers, gamma_c=gamma_c, gamma_w=gamma_w, eps=eps, nu=nu, zeta=zeta).cuda()
+            self.model = myModel(input_dim, N_updates_W, N_updates_C, num_layers=num_layers, gamma_c=gamma_c, gamma_w=gamma_w, eps=eps, nu=nu, zeta=zeta,B=batch_size).cuda()
             self.loss_fun = ISI_loss()
 
 
@@ -188,9 +182,66 @@ class U_TITAN(nn.Module):
         ----------
             layer (int): number of the layer to be trained, numbering starts at 0 (default is 0)
         """   
-        if self.mode == 'first_layer':
-            #self.train_first_layer()
-            pass
+        if self.mode == 'end-to-end':
+
+            # trains the whole network
+            print('=================== End-to-end training ===================')
+            # to store results
+            loss_epochs       =  np.zeros(self.num_epochs)
+            isi_train   =  np.zeros(self.num_epochs)
+            isi_val     =  np.zeros(self.num_epochs)
+            loss_min_val      =  float('Inf')
+            #self.CreateFolders(layer)
+            #folder = os.path.join(self.path_save,'Layer_'+str(layer))
+            dataset = MyDataset(T, K, N, metaparameters_multiparam, size = dataset_size)
+            self.CreateLoader(dataset=dataset, batch_size=self.batch_size) 
+            # defines the optimizer
+            optimizer = torch.optim.Adam(self.parameters(),lr=self.lr)
+            #==========================================================================================================
+            # trains for several epochs
+            for epoch in range(0,self.num_epochs):
+                
+                self.model.train()
+                epoch_loss = 0
+                # goes through all minibatches
+
+                for i,minibatch in enumerate(self.train_loader):
+                    [X, A,Winit,Cinit] = minibatch
+                    #print("Winit size: ", Winit.size())
+                    
+                    W_predicted,_ = self.model(X,A,Winit,Cinit,self.mode,layer)
+                    #print("w predicted requires grad: ", W_predicted.requires_grad)
+
+                    # Computes and prints loss
+                    loss = self.loss_fun(W_predicted, A)
+                    #print("loss requires grad: ", loss.requires_grad)
+                    epoch_loss += torch.Tensor.item(loss)
+                    sys.stdout.write('\r Epoch %d/%d, minibatch %d/%d, loss: %.4f \n' % (epoch+1,self.num_epochs,i+1,self.size_train//self.batch_size,loss))
+
+                    # sets the gradients to zero, performs a backward pass, and updates the weights.
+                    optimizer.zero_grad()
+                    # Check gradients
+                    """for name, param in self.model.named_parameters():
+                        if param.grad is None:
+                            print(f"Parameter '{name}' has no gradient")
+                        else:
+                            pass
+                            print(f"Parameter '{name}' gradient mean: {param.grad.mean().item()}")  """
+                    loss.backward()
+                    optimizer.step()
+
+
+                loss_epochs[epoch] = epoch_loss / len(self.train_loader)
+                print('Epoch %d/%d, loss: %.4f' % (epoch+1,self.num_epochs,loss_epochs[epoch]))
+
+            # Get a list of parameters
+            parameters = list(self.model.parameters())
+
+            # Print the parameters
+            for i, parameter in enumerate(parameters):
+                print(f"Parameter {i}: {parameter}")
+                    
+
 
         elif self.mode == 'greedy':
             # trains the next layer
@@ -260,6 +311,11 @@ class U_TITAN(nn.Module):
         
         ###############################################################################################################
         
+
+
+
+
+
 
         
 test = U_TITAN()

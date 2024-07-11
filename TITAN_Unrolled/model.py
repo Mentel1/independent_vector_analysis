@@ -25,6 +25,35 @@ from data import *
 from torch.utils.data import DataLoader
 from dataloader_file import *
 
+
+
+class MyDataset(Dataset):
+    def __init__(self, T, K, N, metaparameters_multiparam,size):
+        self.T = T
+        self.K = K
+        self.N = N
+        self.metaparameters_multiparam = metaparameters_multiparam
+        self.size = size
+        self.half_size = size // 2
+
+    def __len__(self):
+        # retourne la taille du dataset
+        return self.size  # remplacez par la taille réelle de votre dataset
+
+    def __getitem__(self, idx):
+        # Generates a new sample from the dataset
+        if idx < self.half_size:
+            rho_bounds, lambda_ = self.metaparameters_multiparam[1]  # Use case 2
+        else:
+            rho_bounds, lambda_ = self.metaparameters_multiparam[3]  # Use case 4
+        #print(f"rho_bounds: {rho_bounds}, lambda_: {lambda_}")
+        X, A = generate_whitened_problem(self.T, self.K, self.N, epsilon=1, rho_bounds=rho_bounds, lambda_=lambda_)
+        Winit, Cinit = initialize(self.N, self.K)
+        return X, A, Winit, Cinit
+
+
+
+
 class ISI_loss():
     """
     Defines the ISI training loss.
@@ -35,7 +64,6 @@ class ISI_loss():
     def __init__(self): 
         super(ISI_loss, self).__init__()
         
- 
     def __call__(self, input, target):
         """
         Computes the training loss.
@@ -45,9 +73,20 @@ class ISI_loss():
             target (torch.FloatTensor): ground-truth images, size n*c*h*w
         Returns
         -------
-            (torch.FloatTensor): ISI Score, size 1 
+            (torch.FloatTensor): mean ISI Score of the batch, size 1 
         """
-        return joint_isi(input, target)
+        batch_size = input.shape[0]
+        isi_scores = []
+
+        for i in range(batch_size):
+            W = input[i] # Select the i-th element in the batch and add a batch dimension
+            A = target[i]  # Select the i-th element in the batch and add a batch dimension
+            score = joint_isi(W, A)
+            isi_scores.append(score)
+
+        isi_scores = torch.stack(isi_scores)  # Stack scores into a tensor
+        return torch.mean(isi_scores)
+
 
 
 class FCNN_alpha(nn.Module):
@@ -99,10 +138,12 @@ class W_iter(nn.Module):
         self.N_updates_W = N_updates_W
 
     def inertial_step(self,beta_w,W,W_old):
+        beta_w = beta_w.view(-1, 1, 1, 1)
         W = W + beta_w * (W - W_old)
         return W
     
     def gradient_step(self,Rx,c_w,W,C):
+        c_w = c_w.view(-1, 1, 1, 1)
         W = W - c_w * grad_H_W(W, C, Rx)
         return W
 
@@ -128,10 +169,12 @@ class C_iter(nn.Module):
         self.N_updates_C = N_updates_C
 
     def inertial_step(self,beta_c,C,C_old):
+        beta_c = beta_c.view(-1, 1, 1, 1)
         C = C + beta_c * (C - C_old)
         return C
     
     def gradient_step(self,Rx,c_c,C,W,alpha):
+        c_c = c_c.view(-1, 1, 1, 1)
         C = C - c_c * grad_H_C_reg(W, C, Rx, alpha)
         return C
 
@@ -168,52 +211,74 @@ class Block(nn.Module):
     """
 
 
-    def __init__(self,input_dim, N_updates_W,N_updates_C,gamma_c,gamma_w,eps,nu,zeta):
+    def __init__(self,input_dim, N_updates_W,N_updates_C,gamma_c,gamma_w,eps,nu,zeta,B):
     
-        super(Block, self).__init__()
+        super().__init__()
         self.input_dim = input_dim
-        self.NN_alpha = FCNN_alpha(input_dim, 32)
-        #self.soft         = nn.Softplus()
+        #self.NN_alpha = FCNN_alpha(input_dim, 32)
         #self.reg_mul      = nn.Parameter(torch.FloatTensor([-7]).cuda()) 
         #self.reg_constant = nn.Parameter(torch.FloatTensor([-5]).cuda())
         self.W_iter = W_iter(N_updates_W)
         self.C_iter = C_iter(N_updates_C)
+        self.alpha = nn.Parameter(torch.ones(B).cuda())
+        self.soft = nn.Softmax()
         self.gamma_c = gamma_c
         self.gamma_w = gamma_w
         self.eps = eps
         self.nu = nu
         self.zeta = zeta
+        self.B = B
     
     def get_coefficients(self,Rx,alpha,C,C_i_1):
-        
-        K,_,N = C.shape
+
+        #assert alpha.requires_grad, "alpha does not require grad"
+
+        B,K,_,N = C.shape
         #print("alpha",alpha)
 
         rho_Rx = spectral_norm_extracted(Rx,K,N)
+        rho_Rx_values = rho_Rx.view(B, 1)
         #print("rho_Rx",rho_Rx)
-        l_sup = torch.max((self.gamma_w*alpha)/(1-self.gamma_w),rho_Rx*2*K*(1+torch.sqrt(2/(alpha*self.gamma_c))))
+        part1 = (self.gamma_w*alpha)/(1-self.gamma_w)
+        part2 = rho_Rx*2*K*(1+torch.sqrt(2/(alpha*self.gamma_c)))
+        #print("part1",part1)
+        #print("part2",part2)
 
-        expr3 = torch.tensor(self.gamma_c**2 / K**2, dtype=torch.float32)
+        l_sup = torch.max(part1,part2)
+        #print("l_sup",l_sup)
+
+        expr3 = torch.tensor(self.gamma_c**2 / K**2).expand(B).cuda()
         expr4 = alpha * self.gamma_w / ((1 + self.zeta) * (1 - self.gamma_w) * l_sup)
         expr5 = rho_Rx / ((1 + self.zeta) * l_sup)
 
+        #print("expr3",expr3)
+        #print("expr4",expr4)
+        #print("expr5",expr5)
 
         # Compute the minimum of the three expressions
         C0 = torch.min(torch.min(expr3, expr4), expr5)
+        #print("C0",C0)
 
-
+        
         L_inf = (1+self.zeta)*C0*l_sup
+        #print("L_inf",L_inf)
         L_w_prev = torch.max(L_inf,lipschitz(C_i_1,rho_Rx))
+        #print("C_i_1",C_i_1)
+        #print("lip",lipschitz(C_i_1,rho_Rx))
         L_w = torch.max(L_inf,lipschitz(C,rho_Rx))
+        #print("L_w",L_w)
 
         c_w = self.gamma_w/L_w
+        #print("c_w",c_w)
         beta_w = (1-self.gamma_w)*torch.sqrt(C0*self.nu*(1-self.nu)*L_w_prev/L_w)
+        #print("beta_w",beta_w)
         
-
         c_c = self.gamma_c/alpha
         beta_c = torch.sqrt(C0 * self.nu*(1-self.nu))
 
         return c_w,beta_w,c_c,beta_c
+
+
 
     def forward(self,Rx,W,W_j_1,C,C_j_1,C_i_1):
         """
@@ -230,15 +295,19 @@ class Block(nn.Module):
        	    (torch.FloatTensor): next iterate, output of the layer, n*c*h*w
         """
 
-
+        alpha = self.alpha
+        #print("alpha shape",alpha.shape)
         #alpha = self.NN_alpha(W,C)
-        alpha = torch.tensor(1.0,requires_grad=True)
+        #alpha = torch.tensor(1.0,requires_grad=True)
         #print("alpha",alpha)
-        c_w,beta_w,c_c,beta_c = self.get_coefficients(Rx,alpha,C,C_i_1)
+        
+        c_w, beta_w, c_c ,beta_c = self.get_coefficients(Rx, alpha, C, C_i_1)
+        W, W_j_1  = self.W_iter(Rx, W, W_j_1, C, c_w, beta_w)
+        C, C_j_1, C_i_1  = self.C_iter(Rx, C, C_j_1, W, c_c, beta_c, alpha, self.eps)
 
-        W_updated,W_j_1 = self.W_iter(Rx,W,W_j_1,C,c_w,beta_w)
-        C_updated,C_j_1,C_i_1= self.C_iter(Rx,C,C_j_1,W_updated,c_c,beta_c,alpha,self.eps)
-        return W_updated, W_j_1, C_updated,  C_j_1, C_i_1
+        #W_updated,W_j_1 = self.W_iter(Rx,W,W_j_1,C,c_w,beta_w)
+        #C_updated,C_j_1,C_i_1= self.C_iter(Rx,C,C_j_1,W_updated,c_c,beta_c,alpha,self.eps)
+        return W, W_j_1, C,  C_j_1, C_i_1
 
 
 
@@ -250,36 +319,21 @@ class myModel(nn.Module):
     ----------
         blocks (list): list of Blocks
     """
-    def __init__(self,input_dim, N_updates_W,N_updates_C,num_layers,gamma_c,gamma_w,eps,nu,zeta):
-        super(myModel, self).__init__()
-        self.Layers = nn.ModuleList([Block(input_dim,N_updates_W,N_updates_C,gamma_c,gamma_w,eps,nu,zeta) for _ in range(num_layers)])
+    def __init__(self,input_dim, N_updates_W,N_updates_C,num_layers,gamma_c,gamma_w,eps,nu,zeta,B):
+        super().__init__()
+        self.Layers = nn.ModuleList([Block(input_dim,N_updates_W,N_updates_C,gamma_c,gamma_w,eps,nu,zeta,B) for _ in range(num_layers)])
+        #self.alphas = nn.ParameterList([nn.Parameter(torch.tensor(1.0)) for _ in range(num_layers)])
+        #self.soft = nn.Softplus()
 
 
 
-    def GradFalse(self,block,mode):
-        """
-        Initializes current layer's parameters with previous layer's parameters, fixes the parameters of the previous layers.
-        Parameters
-        ----------
-      	    block (int): block-1 is the layer to be trained
-            mode  (str): 'greedy' if training one layer at a time, 'last_layers_lpp' if training the last 10 layers + lpp
-        """
-        if block>=1:
-            if mode=='greedy':
-                self.Layers[block].load_state_dict(self.Layers[block-1].state_dict())
-            for i in range(0,block):
-                self.Layers[i].eval()
-                for p in self.Layers[i].parameters():
-                    p.requires_grad = False
-                    p.grad          = None
 
-
-    def forward(self,Rx,W,C,A,mode,layer=0):
+    def forward(self,X,A,Winit,Cinit,mode,layer=0):
         """
         Computes the next iterate, output of the model.
         Parameters
         ----------
-      	    W,C            (torch.nn.FloatTensor): previous iterates, size n*N*N*K, n*K*K*N
+      	    W,C            (torch.nn.FloatTensor): previous iterates, size B*N*N*K, B*K*K*N
             Rx             (torch.nn.FloatTensor): covariance matrix of the input, size K*K*N
             mode          (str): 'first_layer' if training the first layer, 'greedy' if training one layer at a time, 'test' if testing
             layer                         (int): layer-1 is the layer to be trained (default is 0)
@@ -289,18 +343,27 @@ class myModel(nn.Module):
         -------
        	    (torch.FloatTensor): next iterates, output of the model, n*N*N*K, n*K*K*N
         """
+        B,N,_,K = X.shape
+        #print("X shape",X.shape)
+        Rx = cov_X(X)
+        #print("Rx shape",Rx.shape)
+        W = Winit
+        C = Cinit
+
+
         if mode=='first_layer' or mode=='greedy':
             C_old = C.clone()
             W,C,C_old = self.Layers[layer](Rx,W,C,C_old)
 
-        elif mode=='test':
+        elif mode=='end-to-end':
             W_j_1 = W.clone()
             C_i_1 = C.clone()
             C_j_1 = C.clone()
             for i in range(len(self.Layers)):
-                # we use .detach() to avoid computing and storing the gradients since the model is being tested
+                #alpha = self.soft(self.alphas[i])
+                #assert self.Layers[i].alpha.requires_grad, f"alpha {i} does not require grad"
                 W,W_j_1,C,C_j_1,C_i_1 = self.Layers[i](Rx,W,W_j_1,C,C_j_1,C_i_1)
-                print("ISI Score Layer ",i+1,": ",joint_isi(W, A))
+                #print("ISI Score Layer ",i+1,": ",joint_isi(W, A))
         return W,C
     
 
@@ -309,63 +372,20 @@ class myModel(nn.Module):
 
 
 
-## Model parameters
-
-gamma_c = 1
-gamma_w = 0.99
-eps = 1e-12
-nu = 0.5
-zeta = 0.1 
 
 
-# Hyperparameters
-
-T = 10000
-K = 2
-N = 3
 
 
-lambda_1 = 0.04
-lambda_2 = 0.25
-rho_bounds_1 = [0.2,0.3]
-rho_bounds_2 = [0.6,0.7]
-rhos = [rho_bounds_1,rho_bounds_2]
-lambdas = [lambda_1,lambda_2]
-
-metaparameters_multiparam = get_metaparameters(rhos,lambdas)
-metaparameters_titles_multiparam = ['Case A','Case B','Case C','Case D']
 
 
-input_dim = N * N * K + K * K * N 
-N_updates_W = 10
-N_updates_C = 1
-num_layers = 100
-mode = 'test'
-size = 1
-
-X,A = generate_whitened_problem(T,K,N,metaparameters_multiparam[0][0],metaparameters_multiparam[0][1])
-Winit,Cinit = initialize(N,K)
-# Save X and A to a file
-print(X)
-torch.save(X, 'Unrolled-TITAN/TITAN_Unrolled/X.pt')
-torch.save(A, 'Unrolled-TITAN/TITAN_Unrolled/A.pt')
-print(X.shape)
-
-torch.save(Winit, 'Unrolled-TITAN/TITAN_Unrolled/Winit.pt')
-torch.save(Cinit, 'Unrolled-TITAN/TITAN_Unrolled/Cinit.pt')  
-
-model = myModel(input_dim, N_updates_W, N_updates_C, num_layers=num_layers, gamma_c=gamma_c, gamma_w=gamma_w, eps=eps, nu=nu, zeta=zeta).cuda()
-Rx = cov_X(X)
 
 
-W_predicted,_ = model(Rx,Winit,Cinit,A,mode)
-print("W_predicted :\n",W_predicted)
 
-"""
 
 
 
 
+"""
 class DeterministicBlock(nn.Module):
     def __init__(self, Rx, rho_Rx, gamma_c, gamma_w, eps, nu, zeta):
         super(DeterministicBlock, self).__init__()
