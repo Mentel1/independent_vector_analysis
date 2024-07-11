@@ -1,6 +1,8 @@
 from data import *
 from functions import *
+from model import *
 from torch.utils.data import DataLoader
+
 
 T = 10000
 K = 2
@@ -14,10 +16,9 @@ lambdas = [lambda_1,lambda_2]
 metaparameters_multiparam = get_metaparameters(rhos,lambdas)
 metaparameters_titles_multiparam = ['Case A','Case B','Case C','Case D']
 size = 1
+B=4
 
 
 
-data = MyDataset(T,K,N,metaparameters_multiparam,size)
-dataloader = DataLoader(data, batch_size=1, shuffle=True)
-
-
+#data = MyDataset(T,K,N,metaparameters_multiparam,size)
+#dataloader = DataLoader(data, batch_size=1, shuffle=True)

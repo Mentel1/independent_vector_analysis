@@ -14,7 +14,29 @@ def make_A(K,N,seed=None):
     else:
         torch.manual_seed(seed)
         A = torch.randn(N, N, K)
+    A = A.to(device='cuda')
     return A
+
+
+def make_A_debug(K, N, seed=None):
+    if seed is not None:
+        torch.manual_seed(seed)
+        
+    A = torch.randn(N, N, K)
+    
+    # Debugging prints
+    print(f"A shape: {A.shape}")
+    print(f"A min value: {A.min()}, A max value: {A.max()}")
+    
+    try:
+        #A = A.to(device='cuda')
+        pass
+    except RuntimeError as e:
+        print(f"Error when moving to CUDA: {e}")
+        return None
+    
+    return A
+
 
 
 def make_Sigma(K,N,rank,epsilon=1,rho_bounds=[0.4,0.6],lambda_=0.25,seed=None,normalize=False):
@@ -31,7 +53,6 @@ def make_Sigma(K,N,rank,epsilon=1,rho_bounds=[0.4,0.6],lambda_=0.25,seed=None,no
     if N == 1:
         rho = [torch.mean(rho_bounds)]
     else:
-        #print(rho_bounds)
         rho = [(n/(N-1))*rho_bounds[1] + (1-(n/(N-1)))*rho_bounds[0] for n in range(N)]
     for n in range(N):
         eta = 1 - lambda_ - rho[n]
@@ -46,24 +67,38 @@ def make_Sigma(K,N,rank,epsilon=1,rho_bounds=[0.4,0.6],lambda_=0.25,seed=None,no
             Sigma[:,:,n] = rho[n]*J + eta*I + (lambda_/rank)*torch.matmul(Q[:, :, n], Q[:, :, n].t())
     for n in range(1,N):
         Sigma[:,:,n] = (1-epsilon)*Sigma[:,:,0] + epsilon*Sigma[:,:,n]
+    Sigma = Sigma.to(device='cuda')
     return Sigma
 
 
-def make_S(Sigma, T):
+
+""" def make_S(Sigma, T):
     _, K, N = Sigma.size()
     S = torch.zeros(N, T, K)
     mean = torch.zeros(K)
     for n in range(N):
         S[n,:,:] = torch.tensor(np.random.multivariate_normal(mean,Sigma[:,:,n],T))
         #S[n, :, :] = torch.normal(mean, torch.sqrt(Sigma[:, :, n]), (T, K))
+    return S """
+
+def make_S(Sigma, T):
+    _, K, N = Sigma.size()
+    S = torch.zeros(N, T, K, device='cuda')
+    mean = torch.zeros(K, device='cuda')
+    
+    for n in range(N):
+        cov_matrix = Sigma[:, :, n]
+        mvn = torch.distributions.MultivariateNormal(mean, cov_matrix)
+        S[n, :, :] = mvn.sample((T,))
     return S
 
+
 def make_X(S,A):
-    X = torch.einsum('NNK,NTK -> NTK',A,S)
+    X = torch.einsum('MNK,NTK -> MTK',A,S)
     return X
 
 
-def generate_whitened_problem(T,K,N,rho_bounds,lambda_,epsilon=1): #, idx_W=None):
+def generate_whitened_problem(T,K,N,epsilon=1,rho_bounds=[0.4,0.6],lambda_=0.25): #, idx_W=None):
     A = make_A(K,N)
     # A = full_to_blocks(A,idx_W,K)
     Sigma = make_Sigma(K,N,rank=K+10,epsilon=epsilon,rho_bounds=rho_bounds,lambda_=lambda_,seed=None,normalize=False)
@@ -71,8 +106,8 @@ def generate_whitened_problem(T,K,N,rho_bounds,lambda_,epsilon=1): #, idx_W=None
     X = make_X(S,A)
     X_,U = whiten_data(X)
     A_ = torch.einsum('nNk,Nvk->nvk', U, A)
-    X_ = X_.cuda()
-    A_ = A_.cuda()
+    X_ = X_.to(device='cuda')
+    A_ = A_.to(device='cuda')
     return X_,A_
 
 
@@ -84,25 +119,3 @@ def get_metaparameters(rhos,lambdas):
     return metaparameters_multiparam
 
 
-class MyDataset(Dataset):
-    def __init__(self, T, K, N, metaparameters_multiparam,size):
-        self.T = T
-        self.K = K
-        self.N = N
-        self.metaparameters_multiparam = metaparameters_multiparam
-        self.size = size
-        self.half_size = size // 2
-
-    def __len__(self):
-        # retourne la taille du dataset
-        return self.size  # remplacez par la taille réelle de votre dataset
-
-    def __getitem__(self, idx):
-        # Generates a new sample from the dataset
-        if idx < self.half_size:
-            rho_bounds, lambda_ = self.metaparameters_multiparam[1]  # Use case 2
-        else:
-            rho_bounds, lambda_ = self.metaparameters_multiparam[3]  # Use case 4
-
-        X, A = generate_whitened_problem(self.T, self.K, self.N, rho_bounds, lambda_)
-        return X, A

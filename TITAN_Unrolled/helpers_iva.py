@@ -310,9 +310,9 @@ def whiten_data(x, dim_red=None):
     else:
         N, T, K = x.shape
 
-        eigval = torch.zeros((N, K), dtype=x.dtype)
-        eigvec = torch.zeros((N, N, K), dtype=x.dtype)
-        x_zm = torch.zeros_like(x)
+        eigval = torch.zeros((N, K), dtype=x.dtype, device=x.device)
+        eigvec = torch.zeros((N, N, K), dtype=x.dtype, device=x.device)
+        x_zm = torch.zeros_like(x, device=x.device)
 
         for k in range(K):
             # Step 1. Center the data.
@@ -327,6 +327,7 @@ def whiten_data(x, dim_red=None):
         # sort eigenvalues and corresponding eigenvectors in descending order
         eigval = torch.flipud(eigval)
         eigvec = torch.flip(eigvec, dims=[1])
+
 
         # Step 4. Forming whitening transformation.
         V = torch.einsum('nk,Nnk -> nNk', 1 / torch.sqrt(eigval[0:dim_red, :]),
