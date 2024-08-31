@@ -18,7 +18,7 @@ def cost_iva_g_reg(W, C, Rx, alpha):
     return res.item()  # Convertir le résultat en un scalaire Python
 
 
-
+                               
 def grad_H_W(W, C, Rx):
     return torch.einsum('bKJN,bNMJ,bJKMm->bNmK',C,W,Rx)
 
@@ -113,7 +113,6 @@ def grad_H_C_reg(W, C, Rx, alpha):
     # Add the regularization term
     indices = torch.arange(K).to(W.device)
     #print("C size: ", C.size())
-    alpha = alpha.view(B, 1, 1)
     #print("alpha size: ", alpha.size())
     grad[:, indices, indices, :] += alpha * (C[:, indices, indices, :] - 1)
     
@@ -135,18 +134,20 @@ def Jdiag_init(X,N,K,Rx):
         C[:,:,n] = np.linalg.inv(Sigma_tmp[:,:,n])
     return W,C
 
-
-def initialize(N,K,init_method='random',Winit=None,Cinit=None,X=None,Rx=None,seed=None):
+def initialize(N, K, B, init_method='random', Winit=None, Cinit=None, X=None, Rx=None, seed=None):
     if Winit is not None and Cinit is not None:
-        W,C = Winit.clone(),Cinit.clone()
+        W, C = Winit.clone(), Cinit.clone()
     elif init_method == 'Jdiag':
-        W,C = Jdiag_init(X,N,K,Rx)
+        W, C = Jdiag_init(X, N, K, Rx)
     elif init_method == 'random':
-        C = make_Sigma(K,N,rank=K+10,seed=seed)
-        W = make_A(K,N,seed=seed)      
+        # Générer des batchs de W et C
+        W = torch.stack([make_A(K, N, seed=seed) for _ in range(B)], dim=0)
+        C = torch.stack([make_Sigma(K, N, rank=K+10, seed=seed) for _ in range(B)], dim=0)
+
     W = W.cuda()
-    C = C.cuda()  
-    return W,C
+    C = C.cuda()
+
+    return W, C
 
 
 
