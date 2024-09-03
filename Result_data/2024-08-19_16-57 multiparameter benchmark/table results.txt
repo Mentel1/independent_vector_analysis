@@ -1,0 +1,43 @@
+\begin{table}[h!]
+\caption{blablabla}
+\vspace{0.4cm}
+\fontsize{5pt}{5pt}\selectfont
+\begin{tabular}{cm{0.5cm}m{0.5cm}cccccc}
+& & & \multicolumn{2}{c}{$K$ = 10} & \multicolumn{2}{c}{$K$ = 20} & \multicolumn{2}{c}{$K$ = 50}\\
+ \cmidrule(lr){4-5} \cmidrule(lr){6-7} \cmidrule(lr){8-9}
+& & & $N$ = 10 & $N$ = 20 & $N$ = 10 & $N$ = 20 & $N$ = 10 & $N$ = 20\\
+\midrule
+\multirow{12}{*}{\rotatebox[origin=c]{90}{\small{\textbf{FVN}}}}& \multirow{2}{*}{\begin{tabular}{c} Case A \end{tabular}}& $\mu_{\rm jISI}$ & 6.03E-02 & 7.34E-02 & 4.02E-02 & 4.19E-02 & \textbf{2.93E-02} & \textbf{3.04E-02}\\
+& & $\mu_T$ & 8.23 & \textit{\textbf{28.89}} & 16.59 & \textit{\textbf{83.80}} & \textit{\textbf{47.56}} & \textit{\textbf{169.29}}\\
+\cmidrule(lr){2-9}& \multirow{2}{*}{\begin{tabular}{c} Case B \end{tabular}}& $\mu_{\rm jISI}$ & \textbf{1.40E-02} & \textbf{1.41E-02} & \textbf{1.13E-02} & \textbf{1.13E-02} & \textbf{1.01E-02} & \textbf{1.00E-02}\\
+& & $\mu_T$ & 1.92 & 4.55 & 4.16 & 12.79 & 12.96 & \textit{\textbf{29.90}}\\
+\cmidrule(lr){2-9}& \multirow{2}{*}{\begin{tabular}{c} Case C \end{tabular}}& $\mu_{\rm jISI}$ & 2.75E-02 & 2.68E-02 & \textbf{1.71E-02} & \textbf{1.69E-02} & \textbf{1.14E-02} & \textbf{1.12E-02}\\
+& & $\mu_T$ & 12.67 & \textit{\textbf{48.99}} & 25.15 & \textit{\textbf{107.60}} & \textit{\textbf{63.18}} & \textit{\textbf{199.15}}\\
+\cmidrule(lr){2-9}& \multirow{2}{*}{\begin{tabular}{c} Case D \end{tabular}}& $\mu_{\rm jISI}$ & \textbf{6.07E-03} & \textbf{6.04E-03} & \textbf{4.97E-03} & \textbf{5.00E-03} & \textbf{4.48E-03} & \textbf{4.49E-03}\\
+& & $\mu_T$ & 2.12 & \textit{\textbf{5.87}} & 5.45 & 16.11 & 18.11 & \textit{\textbf{40.94}}\\
+\bottomrule
+\\
+\midrule
+\multirow{12}{*}{\rotatebox[origin=c]{90}{\small{\textbf{FNN}}}}& \multirow{2}{*}{\begin{tabular}{c} Case A \end{tabular}}& $\mu_{\rm jISI}$ & 1.26E-01 & 1.39E-01 & 6.93E-02 & 8.82E-02 & 5.74E-02 & 4.47E-02\\
+& & $\mu_T$ & 31.26 & 132.70 & 79.26 & 426.37 & 280.18 & 2724.12\\
+\cmidrule(lr){2-9}& \multirow{2}{*}{\begin{tabular}{c} Case B \end{tabular}}& $\mu_{\rm jISI}$ & 1.41E-02 & \textbf{1.41E-02} & \textbf{1.14E-02} & \textbf{1.14E-02} & \textbf{1.01E-02} & \textbf{1.00E-02}\\
+& & $\mu_T$ & 4.50 & 19.29 & 6.99 & 32.76 & 22.08 & 152.46\\
+\cmidrule(lr){2-9}& \multirow{2}{*}{\begin{tabular}{c} Case C \end{tabular}}& $\mu_{\rm jISI}$ & 7.18E-02 & 9.35E-02 & 6.02E-02 & 7.45E-02 & 1.74E-02 & 1.89E-02\\
+& & $\mu_T$ & 37.26 & 175.36 & 67.46 & 369.58 & 222.76 & 1874.09\\
+\cmidrule(lr){2-9}& \multirow{2}{*}{\begin{tabular}{c} Case D \end{tabular}}& $\mu_{\rm jISI}$ & 6.74E-03 & 7.31E-03 & 6.93E-03 & 1.15E-02 & 4.04E-02 & 4.15E-02\\
+& & $\mu_T$ & 8.70 & 36.57 & 24.45 & 126.38 & 117.82 & 639.73\\
+\bottomrule
+\\
+\midrule
+\multirow{12}{*}{\rotatebox[origin=c]{90}{\small{\textbf{TITAN-IVA-G}}}}& \multirow{2}{*}{\begin{tabular}{c} Case A \end{tabular}}& $\mu_{\rm jISI}$ & \textbf{5.47E-02} & \textbf{6.75E-02} & \textbf{3.93E-02} & \textbf{4.10E-02} & 3.04E-02 & 3.11E-02\\
+& & $\mu_T$ & \textit{\textbf{4.69}} & 41.05 & \textit{\textbf{10.21}} & 88.00 & 52.86 & 578.80\\
+\cmidrule(lr){2-9}& \multirow{2}{*}{\begin{tabular}{c} Case B \end{tabular}}& $\mu_{\rm jISI}$ & \textbf{1.40E-02} & \textbf{1.41E-02} & \textbf{1.13E-02} & \textbf{1.13E-02} & \textbf{1.01E-02} & \textbf{1.00E-02}\\
+& & $\mu_T$ & \textit{\textbf{0.71}} & \textit{\textbf{4.05}} & \textit{\textbf{1.76}} & \textit{\textbf{10.17}} & \textit{\textbf{10.58}} & 64.73\\
+\cmidrule(lr){2-9}& \multirow{2}{*}{\begin{tabular}{c} Case C \end{tabular}}& $\mu_{\rm jISI}$ & \textbf{2.55E-02} & \textbf{2.61E-02} & 1.73E-02 & \textbf{1.70E-02} & 1.23E-02 & 1.16E-02\\
+& & $\mu_T$ & \textit{\textbf{6.72}} & 50.39 & \textit{\textbf{14.10}} & 109.46 & 72.75 & 677.23\\
+\cmidrule(lr){2-9}& \multirow{2}{*}{\begin{tabular}{c} Case D \end{tabular}}& $\mu_{\rm jISI}$ & \textbf{6.04E-03} & \textbf{6.00E-03} & \textbf{4.95E-03} & \textbf{4.98E-03} & \textbf{4.48E-03} & \textbf{4.48E-03}\\
+& & $\mu_T$ & \textit{\textbf{0.98}} & 5.94 & \textit{\textbf{2.72}} & \textit{\textbf{16.03}} & \textit{\textbf{17.99}} & 125.08\\
+\bottomrule
+\\
+\end{tabular}
+\end{table}

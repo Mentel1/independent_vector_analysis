@@ -49,8 +49,8 @@ zeta = 1e-3
 # Hyperparameters
 
 T = 10000
-K = 5
-N = 5
+K = 3
+N = 2
 
 lambda_1 = 0.04
 lambda_2 = 0.25
@@ -72,7 +72,7 @@ num_epochs = 1
 batch_size = 4
 num_layers = 300
 
-
+folders = ['kjerkfj','kjsvkj','kndskjn']
 
 
 
@@ -82,7 +82,7 @@ class U_TITAN(nn.Module):
 
     """
 
-    def __init__(self, folders, mode='end-to-end', T=T, K=K, N=N, metaparameters_multiparam=metaparameters_multiparam, size = dataset_size, input_dim = input_dim,
+    def __init__(self, folders = folders, mode='end-to-end', T=T, K=K, N=N, metaparameters_multiparam=metaparameters_multiparam, size = dataset_size, input_dim = input_dim,
                     lr = learning_rate, N_updates_W = N_updates_W,N_updates_C = N_updates_C ,num_epochs = num_epochs, batch_size = batch_size, num_layers=num_layers, gamma_c=gamma_c, gamma_w=gamma_w, eps=eps, nu=nu, zeta=zeta):
             """
             Parameters
@@ -105,7 +105,7 @@ class U_TITAN(nn.Module):
                 batch_size         (list): list of three integers, number of images per batch for training, validation and testing, respectively (default is [10,10,1])                
                 loss_type           (str): name of the training loss (default is 'SSIM')  
             """
-            super(U_TITAN, self).__init__()           
+            super(U_TITAN, self).__init__() # On peut sans doute enlever les commandes entre parenthèses dans le 'super'     
             # unpack information about test conditions and saving folders
             self.T = T
             self.K = K

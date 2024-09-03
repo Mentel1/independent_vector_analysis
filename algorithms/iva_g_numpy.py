@@ -42,8 +42,8 @@ import numpy as np
 import scipy as sc
 import time
 
-from .helpers_iva import  _decouple_trick_numpy, _bss_isi, whiten_data_numpy, \
-    _resort_scvs_numpy
+from .helpers_iva import  _decouple_trick_numpy, _bss_isi, whiten_data_numpy, fast_whiten_data_numpy, \
+    _resort_scvs_numpy, _normalize_column_vectors
 from .initializations import _jbss_sos, _cca
 
 def iva_g_numpy(X, opt_approach='newton', complex_valued=False, circular=False, whiten=True,
@@ -525,5 +525,199 @@ def iva_g_numpy(X, opt_approach='newton', complex_valued=False, circular=False, 
 
     if return_W_change:
         return W, cost, Sigma_N, isi, times, W_change
+    else:
+        return W, cost, Sigma_N, isi, times
+
+def fast_iva_g_numpy(X, opt_approach='newton', complex_valued=False, circular=False, whiten=True,
+          verbose=False, A=None, W_init=None, jdiag_initW=False, max_iter=1024,
+          W_diff_stop=1e-6, alpha0=1.0, return_W_change=False):
+  
+    start = time.time()
+    times = [0]
+
+    # get dimensions
+    N, T, K = X.shape
+
+    if A is not None:
+        supply_A = True
+    else:
+        supply_A = False
+
+    blowup = 1e3
+    # set alpha0 to max(alpha_min, alpha0*alpha_scale) when cost does not decrease
+    alpha_scale = 0.9
+    alpha_min = W_diff_stop
+
+    # whitening is required for the quasi & complex-valued gradient approach
+    whiten = whiten or (opt_approach == 'quasi') or (opt_approach == 'gradient')
+
+    # test if data is zero-mean (test added by Isabell Lehmann)
+    if np.linalg.norm(np.mean(X,axis=1)) > 1e-12:
+        whiten = True
+
+    if whiten:
+        X, V = fast_whiten_data_numpy(X)
+        V = np.transpose(V,(2,0,1))
+
+    # calculate cross-covariance matrices of X
+    R_xx = np.einsum('nvk,mvl -> nmkl',X,X)/T
+    R_xx = (R_xx + np.transpose(R_xx,(1, 0, 3, 2))) / 2
+
+    # Check rank of data-covariance matrix: should be full rank, if not we inflate (this is ad hoc)
+    # concatenate all covariance matrices in a big matrix
+# Calculate R_xx_all and its rank
+    R_xx_all = np.reshape(np.transpose(R_xx,(0, 2, 1, 3)),(N * K, N * K))
+    rank = np.linalg.matrix_rank(R_xx_all)
+
+    # Inflate Rx if necessary
+    if rank < (N * K):
+        _, k, _ = np.linalg.svd(R_xx_all)
+        R_xx_all += k[rank - 1] * np.eye(N * K)  # add smallest singular value to main diagonal
+        R_xx = np.transpose(R_xx_all.reshape(N, K, N, K, order='F'),(0, 2, 1, 3))
+
+    # Initializations
+
+    # Initialize W
+    if W_init is not None:
+        W = W_init.copy()
+        W = np.transpose(W,(2,0,1))
+        if whiten:            
+            W = np.linalg.solve(V,W)
+    else:
+        # randomly initialize
+        W = np.random.randn(K, N, N)
+        W = np.linalg.solve(sc.linalg.sqrtm(np.einsum('knm,kNm->knN',W,W)), W)
+        # W = np.random.randn(N, N, K)
+        # for k in range(K):
+        #     W[:, :, k] = np.linalg.solve(sc.linalg.sqrtm(W[:, :, k] @ W[:, :, k].T), W[:, :, k])
+        # W = np.transpose(W,(2,0,1))
+
+    # Initialize Sigma
+    Sigma = np.einsum('knm,mMkK,KnM->nkK',W,R_xx,W)
+    Sigma = (Sigma + np.transpose(Sigma,(0,2,1)))/2
+    Sigma_inv = np.linalg.inv(Sigma)
+    
+    if supply_A:
+        isi = np.zeros(max_iter)
+        A_w = np.copy(A)
+        if whiten:
+            # A matrix is conditioned by V if data is whitened
+            A_w = np.einsum('kNn,nmk->Nmk',V,A_w)            
+    else:
+        isi = None
+
+    # Initialize some local variables
+    cost = np.zeros(max_iter)
+    cost_const = K * np.log(2 * np.pi * np.exp(1.0))  # local constant
+
+    grad = np.zeros((N, K),dtype=X.dtype)
+    if opt_approach == 'newton':
+        H = np.zeros((N,N,K,K),dtype=X.dtype)
+
+    # to store the change in W in each iteration
+    W_change = []
+    t0 = time.time()
+    # Main Iteration Loop
+    for iteration in range(max_iter):
+        term_criterion = 0
+
+        # Some additional computations of performance via ISI when true A is supplied
+        if supply_A:
+            avg_isi, joint_isi = _bss_isi(np.transpose(W,(1,2,0), A_w))
+            isi[iteration] = joint_isi
+
+        W_old = W.copy()  # save current W as W_old
+        cost[iteration] = 0
+        det_W = np.linalg.det(W)
+        cost[iteration] -= np.sum(np.log(np.abs(det_W)))
+
+        Q = 0
+        R = 0
+        
+        cost[iteration] += 0.5 * (cost_const + np.sum(np.log(np.abs(np.linalg.det(Sigma)))))
+
+        # Loop over each SCV
+        for n in range(N):
+            hnk, Q, R = _decouple_trick_numpy(np.transpose(W,(1,2,0)), n, Q, R)
+            # Loop over each dataset
+            grad = - hnk/np.einsum('kN,Nk->k',W[:,n,:],hnk)
+            grad += np.einsum('NMkK,KM,Kk->Nk',R_xx,W[:,n,:],Sigma_inv[n,:,:])
+            
+            if opt_approach == 'gradient' or (opt_approach == 'quasi'):
+                
+                if opt_approach == 'gradient':
+                    grad_norm = grad/np.linalg.norm(grad,axis=1,keepdims=True) 
+                    grad_norm_proj = grad_norm - np.einsum('kN,Nk->k',W[:,n,:],grad_norm) * W[:,n,:].T
+                    grad_norm_proj = grad_norm_proj/np.linalg.norm(grad_norm_proj,axis=1,keepdims=True) 
+                    W[:, n, :] = (W[:,n,:] - alpha0 * grad_norm_proj.T)/np.linalg.norm(W[:,n,:] - alpha0 * grad_norm_proj.T,axis=1,keepdims=True)
+                    
+                else:  # real-valued quasi (block newton)
+                    # Hessian inverse computed using matrix inversion lemma
+                    aux1 = np.diag(Sigma_inv[n,:,:]) + np.einsum('kM,kM->k',hnk,W[:,n,:])**2
+                    aux2 = np.zeros(N,N,K) - np.einsum('Nk,Mk->NMk',hnk,hnk)
+                    H_inv = aux2 / np.diag(Sigma_inv[n,:,:])*aux1 #H_inv est de dimension NxNxK
+
+                    # Block-Newton update of Wnk
+                    W[:, n, :] = W[:, n, :] - alpha0 * (np.einsum('nNk,Nk->nk',H_inv,grad)).T
+                    W[:, n, :] = W[:, n, :]/np.linalg.norm(W[:, n, :],axis=1,keepdims=True) 
+
+            if opt_approach == 'newton':
+                # Compute SCV Hessian
+                H = np.einsum('Kk,NMkK->MNkK',Sigma_inv[n,:,:],R_xx)
+                H[:,:,np.arange(K),np.arange(K)] += np.einsum('nk,Nk->nNk',hnk,hnk)/np.einsum('kn,nk->k',W[:,n,:],hnk)**2
+                H = np.transpose(H,(0,2,1,3)).reshape(K*N,K*N)
+                H = (H + H.T)/2
+
+                # Newton Update
+                W[:,n,:] -= alpha0 * np.linalg.solve(H, (grad.T).flatten()).reshape(K,N) 
+                W[:,n,:] = W[:,n,:]/np.linalg.norm(W[:,n,:],axis=1,keepdims=True)
+         
+        #Update Sigma
+        
+        Sigma = np.einsum('knm,mMkK,KnM->nkK',W,R_xx,W)
+        Sigma = (Sigma + np.transpose(Sigma,(0,2,1)))/2
+        Sigma_inv = np.linalg.inv(Sigma)                
+        #check criterion
+        
+        term_criterion = np.max(1 - np.abs(np.sum(W*W_old,axis=2)))
+        W_change.append(term_criterion)
+
+        # Decrease step size alpha if cost increased from last iteration
+        if iteration > 0 and cost[iteration] > cost[iteration - 1]:
+            alpha0 = np.maximum(alpha_min, alpha_scale * alpha0)
+
+        # Check the termination condition
+        if term_criterion < W_diff_stop:
+            break
+        elif term_criterion > blowup or np.isnan(cost[iteration]):
+            W = np.eye(N).unsqueeze(2).repeat(1, 1, K) + 0.1 * np.randn(N, N, K)
+            W = np.transpose(W,(2,0,1))
+    
+    times.append(time.time()-t0)
+
+    # Clean-up Outputs
+    cost = cost[0:iteration + 1]
+
+    if supply_A:
+        isi = isi[0:iteration + 1]
+
+    if whiten:
+        W = np.einsum('knN,kNM->knM',W,V)
+    else:  # no prewhitening
+        # Scale demixing vectors to generate unit variance sources
+        W /= np.sqrt(np.einsum('kNn,nmk,kMm->kNM',W,R_xx[:,:,np.arange(K),np.arange(K)],W))
+        # for n in range(N):
+        #     for k in range(K):
+        #         W[n, :, k] /= np.sqrt(W[n, :, k] @ R_xx[:, :, k, k] @ W[n, :, k])
+
+    # Resort order of SCVs: Order the components from most to least ill-conditioned
+    if not whiten:
+        V = None
+    W = np.transpose(W,(1,2,0))
+    V = np.transpose(V,(1,2,0))
+    W, Sigma_N = _resort_scvs_numpy(W, R_xx, whiten, V, complex_valued, circular, None)
+
+    if return_W_change:
+        return W, cost, Sigma_N, isi, W_change, times
     else:
         return W, cost, Sigma_N, isi, times

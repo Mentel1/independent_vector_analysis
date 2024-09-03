@@ -58,25 +58,34 @@ class IvaGAlgorithms:
 
 class IvaG(IvaGAlgorithms):
 
-    def __init__(self,color='b',name='IVA-G-N',legend='IVA-G-N',opt_approach='newton',max_iter=20000,crit_ext=1e-6,library='numpy'):
+    def __init__(self,color='b',name='IVA-G-N',legend='IVA-G-N',opt_approach='newton',max_iter=20000,crit_ext=1e-6,library='numpy',fast=False):
         super().__init__(name=name,legend=legend,color=color,library=library)
         self.alternated = False
         self.opt_approach = opt_approach
         self.max_iter = max_iter
         self.crit_ext = crit_ext
         self.library = library
+        self.fast = fast
 
     def solve(self,X,Winit,Cinit):
             _,_,K = X.shape
             for k in range(K):
                 Winit[:, :, k] = np.linalg.solve(sc.linalg.sqrtm(Winit[:, :, k] @ Winit[:, :, k].T), Winit[:, :, k])
             if self.library == 'numpy':
-                W,_,_,_,_ = iva_g_numpy(X,opt_approach=self.opt_approach,W_diff_stop=self.crit_ext,
+                if self.fast:
+                    W,_,_,_,_ = fast_iva_g_numpy(X,opt_approach=self.opt_approach,W_diff_stop=self.crit_ext,
+                                max_iter=self.max_iter,W_init=Winit)
+                else:
+                    W,_,_,_,_ = iva_g_numpy(X,opt_approach=self.opt_approach,W_diff_stop=self.crit_ext,
                                 max_iter=self.max_iter,W_init=Winit)
             elif self.library == 'torch':
                 Winit = torch.tensor(Winit)
                 X = torch.from_numpy(X)
-                W,_,_,_,_ = iva_g_torch(X,opt_approach=self.opt_approach,W_diff_stop=self.crit_ext,
+                if self.fast:
+                    W,_,_,_,_ = fast_iva_g_torch(X,opt_approach=self.opt_approach,W_diff_stop=self.crit_ext,
+                                max_iter=self.max_iter,W_init=Winit)
+                else:
+                    W,_,_,_,_ = iva_g_torch(X,opt_approach=self.opt_approach,W_diff_stop=self.crit_ext,
                                 max_iter=self.max_iter,W_init=Winit)
             return W  
 

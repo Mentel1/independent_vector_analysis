@@ -93,6 +93,40 @@ def _decouple_trick_torch(W, n, Q=None, R=None):
 
     return H, Q_, R_
 
+# def fast_decouple_trick_numpy(W, Q=None, R=None):
+#         # get dimensions
+#     M, N, K = W.shape
+#     if M != N:
+#         raise AssertionError('Assuming W is square matrix.')
+#     H = np.zeros((N, K), dtype=W.dtype)
+
+#     # use QR recursive method
+#     if n == 0:
+#         Q_ = np.zeros((N, N, K), dtype=W.dtype)
+#         R_ = np.zeros((N, N - 1, K), dtype=W.dtype)
+#     else:
+#         Q_ = np.copy(Q)
+#         R_ = np.copy(R)
+
+#     for k in range(K):
+#         if n == 0:
+#             W_tilde = W[1:N, :, k]
+#             Q_[:, :, k], R_[:, :, k] = np.linalg.qr(np.conj(W_tilde.T), mode='complete')
+#         else:
+#             n_last = n - 1
+#             e_last = np.zeros(N - 1, dtype=W.dtype)
+#             e_last[n_last] = 1
+
+#             # e_last.shape and R.shape[1], W.shape[1] and Q.shape[1] must be equal
+#             Q_[:, :, k], R_[:, :, k] = sc.linalg.qr_update(Q_[:, :, k], R_[:, :, k],
+#                                                            -np.conj(W[n, :, k]), e_last)
+#             Q_[:, :, k], R_[:, :, k] = sc.linalg.qr_update(Q_[:, :, k], R_[:, :, k],
+#                                                            np.conj(W[n_last, :, k]), e_last)
+
+#         H[:, k] = Q_[:, -1, k]
+
+#     return H, Q_, R_
+
 def _bss_isi(W, A, s=None):
     """
     Calculate measure of quality of separation for blind source separation algorithms.
@@ -319,7 +353,7 @@ def whiten_data_numpy(x, dim_red=None):
 
         # Step 4. Forming whitening transformation.
         V = np.einsum('nk,Nnk -> nNk', 1 / np.sqrt(eigval[0:dim_red, :]),
-                      np.conj(eigvec[:, 0:dim_red, :]))
+np.conj(eigvec[:, 0:dim_red, :]))
 
         # Step 5. Form whitened data
         z = np.einsum('nNk, Nvk-> nvk', V, x_zm)
@@ -380,6 +414,72 @@ def whiten_data_torch(x, dim_red=None):
         z = torch.einsum('nNk, Nvk-> nvk', V, x_zm)
     return z, V
 
+def fast_whiten_data_torch(x, dim_red=None):
+    if dim_red is None:
+        dim_red = x.shape[0]
+
+    if x.ndim == 2:
+        N, T = x.shape
+        x_zm = x - torch.mean(x, dim=1, keepdim=True)
+        covar = torch.matmul(x_zm, x_zm.transpose(0, 1)) / T
+        eigval, eigvec = torch.linalg.eigh(covar)
+        eigval = torch.flip(eigval, dims=[0])
+        eigvec = torch.fliplr(eigvec)
+        V = torch.einsum('n,Nn -> nN', 1 / torch.sqrt(eigval[0:dim_red]), torch.conj(eigvec[:, 0:dim_red]))
+        z = torch.matmul(V, x_zm)
+
+    else:
+        N, T, K = x.shape
+        x_zm = x - torch.mean(x, dim=1, keepdim=True)
+        covar = torch.einsum('ntk,mtk->knm',x_zm,x_zm)/T
+        eigval, eigvec = torch.linalg.eigh(covar)
+        eigval = eigval.transpose(0,1)
+        eigvec = eigvec.permute(1,2,0)
+        # sort eigenvalues and corresponding eigenvectors in descending order
+        eigval = torch.flipud(eigval)
+        eigvec = torch.flip(eigvec, dims=[1])
+
+        # Step 4. Forming whitening transformation.
+        V = torch.einsum('nk,Nnk -> nNk', 1 / torch.sqrt(eigval[0:dim_red, :]),
+                      torch.conj(eigvec[:, 0:dim_red, :]))
+
+        # Step 5. Form whitened data
+        z = torch.einsum('nNk, Nvk-> nvk', V, x_zm)
+    return z, V
+
+def fast_whiten_data_numpy(x, dim_red=None):
+    if dim_red is None:
+        dim_red = x.shape[0]
+
+    if x.ndim == 2:
+        N, T = x.shape
+        x_zm = x - np.mean(x,axis=1,keepdims=True)
+        covar = np.matmul(x_zm, x_zm.transpose(0, 1)) / T
+        eigval, eigvec = np.linalg.eigh(covar)
+        eigval = np.flip(eigval, dims=[0])
+        eigvec = np.fliplr(eigvec)
+        V = np.einsum('n,Nn -> nN', 1 / np.sqrt(eigval[0:dim_red]), np.conj(eigvec[:, 0:dim_red]))
+        z = np.matmul(V, x_zm)
+
+    else:
+        N, T, K = x.shape
+        x_zm = x - np.mean(x,axis=1,keepdims=True)
+        covar = np.einsum('ntk,mtk->knm',x_zm,x_zm)/T
+        eigval, eigvec = np.linalg.eigh(covar)
+        eigval = np.transpose(eigval,(1,0))
+        eigvec = np.transpose(eigvec, (1, 2, 0))
+        # sort eigenvalues and corresponding eigenvectors in descending order
+        eigval = np.flipud(eigval)
+        eigvec = np.flip(eigvec, 1)
+
+        # Step 4. Forming whitening transformation.
+        V = np.einsum('nk,Nnk -> nNk', 1 / np.sqrt(eigval[0:dim_red, :]),
+                      eigvec[:, 0:dim_red, :])
+
+        # Step 5. Form whitened data
+        z = np.einsum('nNk, Nvk-> nvk', V, x_zm)
+    return z, V
+
 def _comp_l_sos_cost(W, Y, const_log=None, scale_sources=False):
     N, T, K = Y.shape
     cost = 0
@@ -418,8 +518,8 @@ def _resort_scvs_torch(W, R_xx, whiten=False, V=None, complex_valued=False, circ
     if whiten:
         for k1 in range(K):
             for k2 in range(k1, K):
-                R_xx[:, :, k1, k2] = torch.linalg.solve(R_xx[:, :, k1, k2], V[:, :, k2])[0].T @ torch.linalg.solve(R_xx[:, :, k1, k2].T, V[:, :, k1])[0]
-                R_xx[:, :, k2, k1] = R_xx[:, :, k1, k2].conj().T  # R_xx is Hermitian
+                R_xx[:, :, k1, k2] = torch.linalg.solve(R_xx[:, :, k1, k2], V[:, :, k2])[0] @ torch.linalg.solve(R_xx[:, :, k1, k2].mT, V[:, :, k1])[0]
+                R_xx[:, :, k2, k1] = R_xx[:, :, k1, k2].conj().mT  # R_xx is Hermitian
 
     # Second, compute the determinant of the SCVs
     if complex_valued:
@@ -462,6 +562,7 @@ def _resort_scvs_torch(W, R_xx, whiten=False, V=None, complex_valued=False, circ
     return W, Sigma_N
 
 def _resort_scvs_numpy(W, R_xx, whiten=False, V=None, complex_valued=False, circular=False, P_xx=None):    
+    
     N, _, K = W.shape
 
     # First, compute the data covariance matrices (by undoing any whitening)
@@ -513,3 +614,4 @@ def _resort_scvs_numpy(W, R_xx, whiten=False, V=None, complex_valued=False, circ
         W[:, :, k] = W[isort, :, k]
 
     return W, Sigma_N
+
