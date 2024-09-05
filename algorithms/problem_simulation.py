@@ -37,12 +37,16 @@ def make_Sigma(K,N,rank,epsilon=1,rho_bounds=[0.4,0.6],lambda_=0.25,seed=None,no
         Sigma[:,:,n] = (1-epsilon)*Sigma[:,:,0] + epsilon*Sigma[:,:,n]
     return Sigma
 
-def make_S(Sigma,T):
+def make_S(Sigma,T,distribution = 'Gaussian'):
     _,K,N = Sigma.shape
     S = np.zeros((N,T,K))
     mean = np.zeros(K)
-    for n in range(N):
-        S[n,:,:] = np.random.multivariate_normal(mean,Sigma[:,:,n],T)
+    if distribution == 'Gaussian':
+        for n in range(N):
+            S[n,:,:] = np.random.multivariate_normal(mean,Sigma[:,:,n],T)
+    # elif distribution == 'Laplacian':
+    #     for n in range(N):
+            # S[n,:,:] = np.random.multivariate_normal(mean,Sigma[:,:,n],T)
     return S
 
 def make_X(S,A):
