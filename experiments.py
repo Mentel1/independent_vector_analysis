@@ -17,10 +17,11 @@ rhos = [rho_bounds_1,rho_bounds_2]
 lambdas = [lambda_1,lambda_2]
 # identifiability_levels = [1e-2,1e-1,1])
 # identifiability_levels_names = ['low identifiability','medium identifiability','high identifiability']
-Ks = [10,20,50]
-Ns = [10,20] #,10]
+Ks = [5,10,20]
+Ns = [10,20] 
 
-common_parameters = [Ks,Ns]
+common_parameters_1 = [Ks,Ns]
+# common_parameters_2 = [[5,10,20],[5,10,20]]
 metaparameters_titles_multiparam = ['Case A','Case B','Case C','Case D']
 
 def get_metaparameters(rhos,lambdas):
@@ -42,12 +43,13 @@ metaparameters_multiparam = get_metaparameters(rhos,lambdas)
 
 
 
-algo_titan = TitanIvaG((0,0.4,0),name='titan',alpha=1,gamma_w=0.99,crit_ext=1e-10,crit_int=1e-10,library='numpy')
-algo_palm = TitanIvaG((0,0.4,0),name='palm',alpha=1,gamma_w=0.99,gamma_c = 1.99,nu=0,crit_ext=1e-10,crit_int=1e-10,library='numpy')
+# algo_titan = TitanIvaG((0,0.4,0),name='titan',alpha=1,gamma_w=0.99,crit_ext=1e-10,crit_int=1e-10,library='numpy')
+algo_palm = TitanIvaG((0,0.4,0),name='palm',legend='PALM-IVA-G',alpha=1,gamma_w=0.99,gamma_c = 1.99,nu=0,crit_ext=1e-10,crit_int=1e-10,library='numpy')
+algo_iva_g_n = IvaG((0.5,0,0),name='iva_g_n',legend='IVA-G-N',crit_ext=1e-7,opt_approach='newton',library='numpy')
+algo_iva_g_v = IvaG((0.5,1,0),name='iva_g_v',legend='IVA-G-V',crit_ext=1e-6,opt_approach='gradient',library='numpy')
+# algo_palm_boost = TitanIvaG((0,0.4,0),name='palm_boost',alpha=1,gamma_w=0.99,gamma_c = 1.99,nu=0,crit_ext=1e-10,crit_int=1e-10,library='numpy',boost=True)
 # algo_titan_torch = TitanIvaG((0,0.8,0),name='titan_torch',gamma_w=0.99,crit_ext=1e-10,crit_int=1e-10,library='torch')
-# algo_iva_g_n_numpy = IvaG((0.5,0,0),name='iva_g_n_numpy',legend='NN',crit_ext=1e-7,opt_approach='newton',library='numpy')
 # algo_iva_g_n_torch = IvaG((1,0,0),name='iva_g_n_torch',legend='NT',crit_ext=1e-7,opt_approach='newton',library='torch')
-# algo_iva_g_v_numpy = IvaG((0.5,1,0),name='iva_g_v_numpy',legend='VN',crit_ext=1e-6,opt_approach='gradient',library='numpy')
 # algo_iva_g_v_torch = IvaG((1,1,0),name='iva_g_v_torch',legend='VT',crit_ext=1e-6,opt_approach='gradient',library='torch')
 # algo_fast_iva_g_v_torch = IvaG((1,1,0.5),name='fast_iva_g_v_torch',legend='FVT',crit_ext=1e-6,opt_approach='gradient',library='torch',fast=True)
 # algo_fast_iva_g_n_torch = IvaG((1,0,0.5),name='fast_iva_g_n_torch',legend='FNT',crit_ext=1e-7,opt_approach='newton',library='torch',fast=True)
@@ -55,13 +57,17 @@ algo_palm = TitanIvaG((0,0.4,0),name='palm',alpha=1,gamma_w=0.99,gamma_c = 1.99,
 # algo_fast_iva_g_n_numpy = IvaG((0.5,0,0.5),name='fast_iva_g_n_numpy',legend='FNN',crit_ext=1e-7,opt_approach='newton',library='numpy',fast=True)
 
 
-algos = [algo_titan,algo_palm] #algo_fast_iva_g_v_torch,algo_fast_iva_g_n_numpy,algo_fast_iva_g_n_torch] #,algo_iva_g_v_numpy,algo_iva_g_v_torch,algo_iva_g_n_torch,algo_iva_g_n_numpy] #,algo_iva_g_v_torch] #,algo_titan_numpy,algo_titan_torch,algo_iva_g_v_numpy,algo_iva_g_n_numpy]
+algos = [algo_palm,algo_iva_g_v,algo_iva_g_n]
 
-exp2 = ComparisonExperimentIvaG('alpha benchmark',algos,metaparameters_multiparam,metaparameters_titles_multiparam,
-                                common_parameters,'multiparam',title_fontsize=50,legend_fontsize=6,N_exp=50,charts=False,legend=False)
-exp2.compute()
+
+exp1 = ComparisonExperimentIvaG('multiparameter benchmark palm',algos,metaparameters_multiparam,metaparameters_titles_multiparam,
+                                common_parameters_1,'multiparam',title_fontsize=50,legend_fontsize=6,N_exp=100,charts=False,legend=False)
+# exp2 = ComparisonExperimentIvaG('palm part 2',algos,metaparameters_multiparam,metaparameters_titles_multiparam,
+                                # common_parameters_2,'multiparam',title_fontsize=50,legend_fontsize=6,N_exp=20,charts=False,legend=False)
+exp1.compute()
 # exp2.get_data_from_folder('2024-05-16_02-22')
-exp2.make_table()
+exp1.make_table()
+
 # exp2.make_charts(full=True)
 
 
@@ -69,7 +75,7 @@ exp2.make_table()
 #     import cProfile, pstats
 #     profiler = cProfile.Profile()
 #     profiler.enable()
-#     exp2.compute()
+#     exp1.compute()
 #     profiler.disable()
 #     stats = pstats.Stats(profiler).sort_stats('cumtime')
 #     stats.print_stats()

@@ -125,7 +125,7 @@ def titan_iva_g_reg_numpy(X,alpha=1,gamma_c=1,gamma_w=0.99,max_iter=20000,
                          eps=10**(-12),track_cost=False,seed=None,
                          track_jisi=False,track_diff=False,B=None,nu=0.5,zeta=1e-3,
                          max_iter_int_C=1,adaptative_gamma_w=False,
-                         gamma_w_decay=0.9):
+                         gamma_w_decay=0.9,boost=False):
     N,T,K = X.shape
     alpha, gamma_c, gamma_w = to_float64(alpha, gamma_c, gamma_w)
     # if (not adaptative_gamma_w) and gamma_w > 1:
@@ -167,10 +167,14 @@ def titan_iva_g_reg_numpy(X,alpha=1,gamma_c=1,gamma_w=0.99,max_iter=20000,
         W_old0 = W.copy()
         N_step_int_W = 0
         N_step_int_C = 0 #here
+        c_w = gamma_w/L_w
+        # if boost:
+        #     Hess = np.einsum('KJn,KJNM->nKNJM',C,Rx)
+        #     Hess = np.reshape(Hess,(N,N*K,N*K))
+        #     c_w = gamma_w/np.max(np.linalg.norm(Hess,ord=2,axis=(1,2)))
         # gamma_w = gamma_w0
         while diff_int > crit_int and N_step_int_W < max_iter_int:
-            # W_old = W.copy()
-            c_w = gamma_w/L_w
+            # W_old = W.copy() 
             beta_w = (1-gamma_w)*np.sqrt(C0*nu*(1-nu)*L_w_prev/L_w)
             tau_w = beta_w
             W_tilde = W + beta_w*(W-W_prev)

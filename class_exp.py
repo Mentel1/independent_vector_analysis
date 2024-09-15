@@ -35,7 +35,7 @@ class ComparisonExperimentIvaG:
       
     def __init__(self,name,algos,meta_parameters,meta_parameters_titles,common_parameters,mode='multiparam',
                  T=10000,N_exp=100,table=False,table_fontsize=5,median=False,std=False,charts=False,legend=True,
-                 legend_fontsize=5,title_fontsize=10):  
+                 legend_fontsize=5,title_fontsize=10,given_setup=False,store_setup=False):  
         self.algos = algos
         self.N_exp = N_exp
         self.mode = mode
@@ -55,8 +55,17 @@ class ComparisonExperimentIvaG:
         self.title_fontsize = title_fontsize
         self.legend_fontsize = legend_fontsize
         now = datetime.now()
-        self.date = now.strftime("%Y-%m-%d_%H-%M")
+        self.date = now.strftime("%Y-%m-%d_%H-%M") 
+        self.setup = {}
+        self.store_setup = store_setup
+        if given_setup:
+            self.get_setup()
+            self.store_setup = False
+            
          
+    def get_setup(self):
+        pass
+    
     def get_data_from_folder(self,date):
         self.date = date
         foldername = 'Result_data/' + self.date + ' ' + self.name
@@ -141,9 +150,9 @@ class ComparisonExperimentIvaG:
                     for ik,K in enumerate(Ks):
                         for jn,N in enumerate(Ns):
                             if np.mean(algo.times[a,ik,jn,:]) <= best_times[a,ik,jn] + tol_time:
-                                file.write(' & \\textit{{\\textbf{{{:.2f}}}}}'.format(np.mean(algo.times[a,ik,jn,:])))
+                                file.write(' & \\textit{{\\textbf{{{:.1f}}}}}'.format(np.mean(algo.times[a,ik,jn,:])))
                             else:
-                                file.write(' & {:.2f}'.format(np.mean(algo.times[a,ik,jn,:])))
+                                file.write(' & {:.1f}'.format(np.mean(algo.times[a,ik,jn,:])))
                     file.write('\\\\\n')
                     if a == len(self.meta_parameters)-1:
                         file.write('\\bottomrule\n')
@@ -209,9 +218,15 @@ class ComparisonExperimentIvaG:
             for ik,K in enumerate(Ks):
                 for jn,N in enumerate(Ns):
                     os.makedirs(output_folder+'/{}/N = {} K = {}'.format(self.meta_parameters_titles[a],N,K))
+                    if self.store_setup:
+                        self.setup['Datasets {} {} {}'.format(a,K,N)].tofile(output_folder+'/{}/N = {} K = {}/Datasets'.format(self.meta_parameters_titles[a],N,K),sep=',')
+                        self.setup['Mixing {} {} {}'.format(a,K,N)].tofile(output_folder+'/{}/N = {} K = {}/Mixing matrices'.format(self.meta_parameters_titles[a],N,K),sep=',')
+                        self.setup['Winits {} {} {}'.format(a,K,N)].tofile(output_folder+'/{}/N = {} K = {}/Winits'.format(self.meta_parameters_titles[a],N,K),sep=',')
+                        self.setup['Cinits {} {} {}'.format(a,K,N)].tofile(output_folder+'/{}/N = {} K = {}/Cinits'.format(self.meta_parameters_titles[a],N,K),sep=',')
                     for algo in self.algos: 
                         algo.results[a,ik,jn,:].tofile(output_folder+'/{}/N = {} K = {}/results_{}'.format(self.meta_parameters_titles[a],N,K,algo.name),sep=',')
                         algo.times[a,ik,jn,:].tofile(output_folder+'/{}/N = {} K = {}/times_{}'.format(self.meta_parameters_titles[a],N,K,algo.name),sep=',')
+                        
         if self.charts:
             self.make_charts()
         if self.table:
@@ -225,17 +240,27 @@ class ComparisonExperimentIvaG:
         for a,metaparam in enumerate(self.meta_parameters):
             for ik,K in enumerate(Ks):
                 for jn,N in enumerate(Ns):
+                    Datasets = np.zeros((self.N_exp,N,self.T,K))
+                    Mixing = np.zeros((self.N_exp,N,N,K))
+                    Winits = np.zeros((self.N_exp,N,N,K))
+                    Cinits = np.zeros((self.N_exp,K,K,N))
                     for exp in range(self.N_exp):
                         if self.mode == 'identifiability':
                             X,A = generate_whitened_problem(self.T,K,N,epsilon=metaparam)
                         elif self.mode == 'multiparam':
                             rho_bounds,lambda_ = metaparam
                             X,A = generate_whitened_problem(self.T,K,N,rho_bounds=rho_bounds,lambda_=lambda_)
-                        Winit = make_A(K,N)
-                        Cinit = make_Sigma(K,N,rank=K+10)
+                        Datasets[exp,:,:,:] = X
+                        Mixing[exp,:,:,:] = A
+                        Winits[exp,:,:,:] = make_A(K,N)
+                        Cinits[exp,:,:,:] = make_Sigma(K,N,rank=K+10)
                         for algo in self.algos:
-                            algo.fill_experiment(X,A,(a,ik,jn,exp),Winit.copy(),Cinit.copy())
-                            print(a,' K =',K,' N =',N,algo.name + ' : ',algo.results[a,ik,jn,exp],algo.times[a,ik,jn,exp] )
+                            algo.fill_experiment(X,A,(a,ik,jn,exp),Winits[exp,:,:,:].copy(),Cinits[exp,:,:,:].copy())
+                            print(a,' K =',K,' N =',N,algo.name,' : ',algo.results[a,ik,jn,exp],algo.times[a,ik,jn,exp])
+                    self.setup['Datasets {} {} {}'.format(a,K,N)] = Datasets
+                    self.setup['Mixing {} {} {}'.format(a,K,N)] = Mixing
+                    self.setup['Winits {} {} {}'.format(a,K,N)] = Winits
+                    self.setup['Cinits {} {} {}'.format(a,K,N)] = Cinits
         self.store_in_folder()
 
     def draw_jisi_evolutions(self):

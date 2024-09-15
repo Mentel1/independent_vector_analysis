@@ -144,7 +144,7 @@ class PalmIvaG(IvaGAlgorithms):
 class TitanIvaG(IvaGAlgorithms):    
 
     def __init__(self,color,name='titan',legend='TITAN-IVA-G',nu=0.5,max_iter=20000,max_iter_int=15,max_iter_int_C=1,
-                 crit_ext=1e-10,crit_int=1e-10,gamma_w=0.99,gamma_c=1,alpha=1,seed=None,library='numpy'):
+                 crit_ext=1e-10,crit_int=1e-10,gamma_w=0.99,gamma_c=1,alpha=1,seed=None,library='numpy',boost=False):
         super().__init__(name=name,legend=legend,color=color,library=library)
         self.crit_int = crit_int
         self.crit_ext = crit_ext
@@ -158,6 +158,7 @@ class TitanIvaG(IvaGAlgorithms):
         self.gamma_c = gamma_c
         self.seed = seed
         self.library = library
+        self.boost = boost
 
     def solve(self,X,Winit=None,Cinit=None):
         if self.library == 'numpy':
@@ -165,7 +166,7 @@ class TitanIvaG(IvaGAlgorithms):
                                      crit_ext=self.crit_ext,crit_int=self.crit_int,
                                      max_iter=self.max_iter,max_iter_int=self.max_iter_int,
                                      max_iter_int_C=self.max_iter_int_C,nu=self.nu,
-                                     Winit=Winit,Cinit=Cinit,seed=self.seed)
+                                     Winit=Winit,Cinit=Cinit,seed=self.seed,boost=self.boost)
         elif self.library == 'torch':
             W,_,_,_ = titan_iva_g_reg_torch(X,alpha=self.alpha,gamma_w=self.gamma_w,gamma_c=self.gamma_c,
                                      crit_ext=self.crit_ext,crit_int=self.crit_int,
