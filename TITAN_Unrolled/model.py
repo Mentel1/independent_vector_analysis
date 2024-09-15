@@ -19,11 +19,12 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
+import math
 from functions import *
 from tools import *
 from data import *
 from torch.utils.data import DataLoader
-from dataloader_file import *
+#from dataloader_file import *
 
 
 
@@ -62,7 +63,7 @@ class ISI_loss():
         ISI : function computing the ISI Score 
     """
     def __init__(self): 
-        super(ISI_loss, self).__init__()
+        super().__init__()
         
     def __call__(self, input, target):
         """
@@ -99,7 +100,7 @@ class FCNN_alpha(nn.Module):
         soft (torch.nn.Softplus): Softplus activation function
     """
     def __init__(self, input_size, hidden_size, output_size=1):
-        super(FCNN_alpha, self).__init__()
+        super().__init__()
         self.fc1 = nn.Linear(input_size, hidden_size)
         self.fc2 = nn.Linear(hidden_size, output_size)
         self.soft = nn.Softplus()
@@ -115,15 +116,17 @@ class FCNN_alpha(nn.Module):
         -------
             torch.FloatTensor: alpha parameter, size [batch_size, 1]
         """
+        B, K, _, N = C.shape
         # Flatten W to size [N*N*K]
-        W = W.view(-1)
+        W = W.reshape(W.size(0), -1)
         # Flatten C to size [K*K*N]
-        C = C.view(-1)
+        C = C.reshape(W.size(0), -1)
         # Concatenate W and C along the last dimension
-        x = torch.cat((W, C))
+        x = torch.cat((W, C), dim=-1)
         x = self.soft(self.fc1(x))
         x = self.fc2(x)
         x = self.soft(x)
+        x = x.squeeze(dim=-1)
         return x
 
 
@@ -133,11 +136,14 @@ class FCNN_alpha(nn.Module):
 
 class W_iter(nn.Module):
 
-    def __init__(self,N_updates_W):
+    def __init__(self,N_updates_W,learning_mode):
         super(W_iter, self).__init__()
         self.N_updates_W = N_updates_W
+        self.mode = learning_mode
 
     def inertial_step(self,beta_w,W,W_old):
+        #print("W shape",W.shape)
+        #print("beta_w shape",beta_w.shape)
         beta_w = beta_w.view(-1, 1, 1, 1)
         W = W + beta_w * (W - W_old)
         return W
@@ -151,10 +157,21 @@ class W_iter(nn.Module):
         return prox_f(W, c_w)
 
     def update(self,Rx,W,W_j_1,C,c_w,beta_w):
-        W_inertial = self.inertial_step(beta_w,W,W_j_1)
-        W_gradient = self.gradient_step(Rx,c_w,W_inertial,C)
-        W_prox = self.prox_step(c_w,W_gradient)
-        return W_prox,W
+        if self.mode == 'with_inertial':
+            W_inertial = self.inertial_step(beta_w,W,W_j_1)
+            W_gradient = self.gradient_step(Rx,c_w,W_inertial,C)
+            W_prox = self.prox_step(c_w,W_gradient)
+            return W_prox,W
+        
+        if self.mode == 'no_inertial':
+            W_gradient = self.gradient_step(Rx,c_w,W,C)
+            W_prox = self.prox_step(c_w,W_gradient)
+            return W_prox,W
+        else :  
+            W_inertial = self.inertial_step(beta_w,W,W_j_1)
+            W_gradient = self.gradient_step(Rx,c_w,W_inertial,C)
+            W_prox = self.prox_step(c_w,W_gradient)
+            return W_prox,W
     
     def forward(self,Rx,W,W_j_1,C,c_w,beta_w):
         for _ in range(self.N_updates_W):
@@ -164,9 +181,10 @@ class W_iter(nn.Module):
 
 
 class C_iter(nn.Module):
-    def __init__(self,N_updates_C):
+    def __init__(self,N_updates_C,learning_mode):
         super(C_iter, self).__init__()
         self.N_updates_C = N_updates_C
+        self.mode = learning_mode
 
     def inertial_step(self,beta_c,C,C_old):
         beta_c = beta_c.view(-1, 1, 1, 1)
@@ -182,10 +200,21 @@ class C_iter(nn.Module):
         return prox_g(C, c_c, eps)
     
     def update(self,Rx,C,C_j_1,W_updated,c_c,beta_c,alpha,eps):
-        C_inertial = self.inertial_step(beta_c,C,C_j_1)
-        C_gradient = self.gradient_step(Rx,c_c,C_inertial,W_updated,alpha)
-        C_prox = self.prox_step(c_c,C_gradient,eps)
-        return C_prox,C
+        if self.mode == 'with_inertial':
+            C_inertial = self.inertial_step(beta_c,C,C_j_1)
+            C_gradient = self.gradient_step(Rx,c_c,C_inertial,W_updated,alpha)
+            C_prox = self.prox_step(c_c,C_gradient,eps)
+            return C_prox,C
+        
+        if self.mode == 'no_inertial':
+            C_gradient = self.gradient_step(Rx,c_c,C,W_updated,alpha)
+            C_prox = self.prox_step(c_c,C_gradient,eps)
+            return C_prox,C
+        else :
+            C_inertial = self.inertial_step(beta_c,C,C_j_1)
+            C_gradient = self.gradient_step(Rx,c_c,C_inertial,W_updated,alpha)
+            C_prox = self.prox_step(c_c,C_gradient,eps)
+            return C_prox,C
 
     def forward(self,Rx,C,C_j_1,W_updated,c_c,beta_c,alpha,eps):
         C_i_1 = C.clone()
@@ -211,38 +240,66 @@ class Block(nn.Module):
     """
 
 
-    def __init__(self,input_dim, N_updates_W,N_updates_C,gamma_c,gamma_w,eps,nu,zeta,B):
+    def __init__(self,K,N,input_dim, N_updates_W,N_updates_C,gamma_c,gamma_w,eps,nu,zeta,learning_mode):
     
         super().__init__()
-        self.input_dim = input_dim
         #self.NN_alpha = FCNN_alpha(input_dim, 32)
         #self.reg_mul      = nn.Parameter(torch.FloatTensor([-7]).cuda()) 
         #self.reg_constant = nn.Parameter(torch.FloatTensor([-5]).cuda())
-        self.W_iter = W_iter(N_updates_W)
-        self.C_iter = C_iter(N_updates_C)
-        self.alpha = nn.Parameter(torch.ones(B).cuda())
-        self.soft = nn.Softmax()
-        self.gamma_c = gamma_c
-        self.gamma_w = gamma_w
+        self.W_iter = W_iter(N_updates_W,learning_mode)
+        self.C_iter = C_iter(N_updates_C,learning_mode)
+
+        #self.alpha = nn.Parameter(torch.FloatTensor([1]).cuda())
+        self.alpha = nn.Parameter(torch.empty(1).cuda())
+
+        torch.nn.init.normal_(self.alpha, mean=0, std=0.01)
+
+        # Manually apply He initialization for a scalar
+        #std = math.sqrt(2.)  # Typical scale factor for He initialization
+        #with torch.no_grad():
+            #self.alpha.normal_(0, std)
+
+        if learning_mode == 'with_inertial':
+            self.gamma_w = nn.Parameter(torch.FloatTensor([0.5]).cuda())
+            self.gamma_c = nn.Parameter(torch.FloatTensor([0.5]).cuda())
+            self.beta_w = nn.Parameter(torch.empty(1).cuda())
+            self.beta_c = nn.Parameter(torch.empty(1).cuda())
+
+            torch.nn.init.normal_(self.beta_w, mean=0, std=0.01)
+            torch.nn.init.normal_(self.beta_c, mean=0, std=0.01)
+            #torch.nn.init.uniform_(self.beta_w, a=-1, b=1)
+            #print("beta_w",self.beta_w)
+            #torch.nn.init.uniform_(self.beta_c, a=-1, b=1) 
+            #print("beta_c",self.beta_c)
+
+        elif learning_mode == 'no_inertial':
+            self.gamma_w = nn.Parameter(torch.FloatTensor([1]).cuda())
+            self.gamma_c = nn.Parameter(torch.FloatTensor([1]).cuda())
+
+        else:
+            self.gamma_w = gamma_w
+            self.gamma_c = gamma_c
+         
+        self.softplus = nn.Softplus()
+        self.relu = nn.ReLU()
+        self.tanh = nn.Tanh()
+        self.sigmoid = nn.Sigmoid()
         self.eps = eps
         self.nu = nu
         self.zeta = zeta
-        self.B = B
+        self.learning_mode = learning_mode
     
-    def get_coefficients(self,Rx,alpha,C,C_i_1):
+    def get_coefficients(self,rho_Rx,alpha,C,C_i_1):
 
         #assert alpha.requires_grad, "alpha does not require grad"
 
-        B,K,_,N = C.shape
-        #print("alpha",alpha)
-
-        rho_Rx = spectral_norm_extracted(Rx,K,N)
-        rho_Rx_values = rho_Rx.view(B, 1)
-        #print("rho_Rx",rho_Rx)
+        B, K, _, N = C.shape
+        #print("alpha",alpha.shape)
+        #print("rho_Rx",rho_Rx.shape)
+        
         part1 = (self.gamma_w*alpha)/(1-self.gamma_w)
         part2 = rho_Rx*2*K*(1+torch.sqrt(2/(alpha*self.gamma_c)))
-        #print("part1",part1)
-        #print("part2",part2)
+
 
         l_sup = torch.max(part1,part2)
         #print("l_sup",l_sup)
@@ -280,7 +337,7 @@ class Block(nn.Module):
 
 
 
-    def forward(self,Rx,W,W_j_1,C,C_j_1,C_i_1):
+    def forward(self,Rx,rho_Rx,W,W_j_1,C,C_j_1,C_i_1):
         """
         Computes the next iterate, output of the layer.
         Parameters
@@ -295,15 +352,36 @@ class Block(nn.Module):
        	    (torch.FloatTensor): next iterate, output of the layer, n*c*h*w
         """
 
-        alpha = self.alpha
+        alpha = self.softplus(self.alpha)
+        #print("alpha",alpha)
+
+    
         #print("alpha shape",alpha.shape)
         #alpha = self.NN_alpha(W,C)
         #alpha = torch.tensor(1.0,requires_grad=True)
-        #print("alpha",alpha)
+
+        if self.learning_mode == 'with_inertial':
+            gamma_w = 0.3 + 2 * (self.tanh(self.gamma_w) + 1)  # gamma_w in [0.3, 10.3]
+            gamma_c = 0.3 + 2 * (self.tanh(self.gamma_c) + 1)  # gamma_c in [0.3, 10.3]
+            c_w = gamma_w / lipschitz(C, rho_Rx)
+            c_c = gamma_c / alpha
+            beta_w = self.softplus(self.beta_w)
+            beta_c = self.softplus(self.beta_c)
+
+        elif self.learning_mode == 'no_inertial':
+            gamma_w = 0.3 + 5 * (self.tanh(self.gamma_w) + 1)  # gamma_w in [0.3, 10.3]
+            gamma_c = 0.3 + 5 * (self.tanh(self.gamma_c) + 1)  # gamma_c in [0.3, 10.3]
+            c_w = gamma_w / lipschitz(C,rho_Rx)
+            c_c = gamma_c / alpha
+            beta_w = 0
+            beta_c = 0
+            
+        else:
+            c_w, beta_w, c_c ,beta_c = self.get_coefficients(rho_Rx, alpha, C, C_i_1)
         
-        c_w, beta_w, c_c ,beta_c = self.get_coefficients(Rx, alpha, C, C_i_1)
         W, W_j_1  = self.W_iter(Rx, W, W_j_1, C, c_w, beta_w)
         C, C_j_1, C_i_1  = self.C_iter(Rx, C, C_j_1, W, c_c, beta_c, alpha, self.eps)
+
 
         #W_updated,W_j_1 = self.W_iter(Rx,W,W_j_1,C,c_w,beta_w)
         #C_updated,C_j_1,C_i_1= self.C_iter(Rx,C,C_j_1,W_updated,c_c,beta_c,alpha,self.eps)
@@ -319,16 +397,14 @@ class myModel(nn.Module):
     ----------
         blocks (list): list of Blocks
     """
-    def __init__(self,input_dim, N_updates_W,N_updates_C,num_layers,gamma_c,gamma_w,eps,nu,zeta,B):
+    def __init__(self,K,N,input_dim, N_updates_W,N_updates_C,num_layers,gamma_c,gamma_w,eps,nu,zeta,learning_mode):
         super().__init__()
-        self.Layers = nn.ModuleList([Block(input_dim,N_updates_W,N_updates_C,gamma_c,gamma_w,eps,nu,zeta,B) for _ in range(num_layers)])
-        #self.alphas = nn.ParameterList([nn.Parameter(torch.tensor(1.0)) for _ in range(num_layers)])
-        #self.soft = nn.Softplus()
+        self.Layers = nn.ModuleList([Block(K,N,input_dim,N_updates_W,N_updates_C,gamma_c,gamma_w,eps,nu,zeta,learning_mode) for _ in range(num_layers)])
+        self.isi_scores = []
 
 
 
-
-    def forward(self,X,A,Winit,Cinit,mode,layer=0):
+    def forward(self,X,A,mode,layer=0):
         """
         Computes the next iterate, output of the model.
         Parameters
@@ -346,14 +422,15 @@ class myModel(nn.Module):
         B,N,_,K = X.shape
         #print("X shape",X.shape)
         Rx = cov_X(X)
+        rho_Rx = spectral_norm_extracted(Rx,K,N)
         #print("Rx shape",Rx.shape)
-        W = Winit
-        C = Cinit
+        W,C = initialize(N,K,B)
+        
 
 
         if mode=='first_layer' or mode=='greedy':
             C_old = C.clone()
-            W,C,C_old = self.Layers[layer](Rx,W,C,C_old)
+            W,C,C_old = self.Layers[layer](rho_Rx,W,C,C_old)
 
         elif mode=='end-to-end':
             W_j_1 = W.clone()
@@ -362,9 +439,20 @@ class myModel(nn.Module):
             for i in range(len(self.Layers)):
                 #alpha = self.soft(self.alphas[i])
                 #assert self.Layers[i].alpha.requires_grad, f"alpha {i} does not require grad"
-                W,W_j_1,C,C_j_1,C_i_1 = self.Layers[i](Rx,W,W_j_1,C,C_j_1,C_i_1)
+                W,W_j_1,C,C_j_1,C_i_1 = self.Layers[i](Rx,rho_Rx,W,W_j_1,C,C_j_1,C_i_1)
+                #print("W",W)
+                #print("ISI Score Layer ",i+1,": ",ISI_loss()(W, A))
+        
+        elif mode=='test':
+            W_j_1 = W.clone()
+            C_i_1 = C.clone()
+            C_j_1 = C.clone()
+            for i in range(len(self.Layers)):
+                W,W_j_1,C,C_j_1,C_i_1 = self.Layers[i](Rx,rho_Rx,W.detach(),W_j_1.detach(),C.detach(),C_j_1.detach(),C_i_1.detach())
                 #print("ISI Score Layer ",i+1,": ",joint_isi(W, A))
-        return W,C
+                self.isi_scores.append(ISI_loss()(W, A))
+
+        return W,C         
     
 
 

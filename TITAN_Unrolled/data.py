@@ -2,7 +2,37 @@ import torch
 import numpy as np
 from tools import *
 from torch.utils.data import Dataset
-from helpers_iva import whiten_data
+from helpers_iva import whiten_data 
+import os
+
+ 
+class MyDatasetFolder(Dataset):
+    def __init__(self, base_path, K, N, size):
+        self.path = os.path.join(base_path, f"K_{K}_N_{N}")
+        self.all_files = [f for f in os.listdir(self.path) if f.endswith(".pt")]
+        #print("files in path: ", self.all_files)
+        
+        # Take only the first `size` files
+        self.data_files = self.all_files[:size]
+        
+
+    def __len__(self):
+        return len(self.data_files)
+
+    def __getitem__(self, idx):
+        
+        X_A_file = os.path.join(self.path, self.data_files[idx])
+        #print("X_A_file: ", X_A_file)
+        X_A_item = torch.load(X_A_file)
+        #print(f"X_A_item: {X_A_item}")
+
+        X_item, A_item = X_A_item[0], X_A_item[1]
+        return X_item, A_item
+
+
+
+
+
 
 
 ## Problem simumation functions 
