@@ -1,0 +1,8 @@
+20 runs
+alpha in (0.1,0.5,1,5,10)
+N in (5,10,20)
+K in (5,10,20)
+cases A,B,C,D
+gamma_w = 0.99
+gamma_c = 1.99
+crit_ext = crit_int = 1e-10

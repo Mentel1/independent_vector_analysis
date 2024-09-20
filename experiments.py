@@ -3,10 +3,8 @@ import matplotlib as mpl
 import cProfile
 from class_exp import *
 from class_algos import *
-#------------------------------------------------------------------------------------------------------
-
-
-
+from algorithms.iva_g_numpy import *
+from algorithms.titan_iva_g_reg_numpy import *
 #------------------------------------------------------------------------------------------------------
 
 lambda_1 = 0.04
@@ -48,25 +46,46 @@ algo_palm = TitanIvaG((0,0.4,0),name='palm',legend='PALM-IVA-G',alpha=1,gamma_w=
 algo_iva_g_n = IvaG((0.5,0,0),name='iva_g_n',legend='IVA-G-N',crit_ext=1e-7,opt_approach='newton',library='numpy')
 algo_iva_g_v = IvaG((0.5,1,0),name='iva_g_v',legend='IVA-G-V',crit_ext=1e-6,opt_approach='gradient',library='numpy')
 # algo_palm_boost = TitanIvaG((0,0.4,0),name='palm_boost',alpha=1,gamma_w=0.99,gamma_c = 1.99,nu=0,crit_ext=1e-10,crit_int=1e-10,library='numpy',boost=True)
-# algo_titan_torch = TitanIvaG((0,0.8,0),name='titan_torch',gamma_w=0.99,crit_ext=1e-10,crit_int=1e-10,library='torch')
-# algo_iva_g_n_torch = IvaG((1,0,0),name='iva_g_n_torch',legend='NT',crit_ext=1e-7,opt_approach='newton',library='torch')
-# algo_iva_g_v_torch = IvaG((1,1,0),name='iva_g_v_torch',legend='VT',crit_ext=1e-6,opt_approach='gradient',library='torch')
-# algo_fast_iva_g_v_torch = IvaG((1,1,0.5),name='fast_iva_g_v_torch',legend='FVT',crit_ext=1e-6,opt_approach='gradient',library='torch',fast=True)
-# algo_fast_iva_g_n_torch = IvaG((1,0,0.5),name='fast_iva_g_n_torch',legend='FNT',crit_ext=1e-7,opt_approach='newton',library='torch',fast=True)
-# algo_fast_iva_g_v_numpy = IvaG((0.5,1,0.5),name='fast_iva_g_v_numpy',legend='FVN',crit_ext=1e-6,opt_approach='gradient',library='numpy',fast=True)
-# algo_fast_iva_g_n_numpy = IvaG((0.5,0,0.5),name='fast_iva_g_n_numpy',legend='FNN',crit_ext=1e-7,opt_approach='newton',library='numpy',fast=True)
 
 
-algos = [algo_palm,algo_iva_g_v,algo_iva_g_n]
+algos = [algo_palm,algo_iva_g_n,algo_iva_g_v]
 
 
-exp1 = ComparisonExperimentIvaG('multiparameter benchmark palm',algos,metaparameters_multiparam,metaparameters_titles_multiparam,
-                                common_parameters_1,'multiparam',title_fontsize=50,legend_fontsize=6,N_exp=100,charts=False,legend=False)
+N = 20
+K = 20
+T = 10000
+rho_bounds = [0.2,0.3]
+lambda_ = 0.25
+epsilon = 1
+X,A = generate_whitened_problem(T,K,N,epsilon,rho_bounds,lambda_)
+Winit = make_A(K,N)
+Cinit = make_Sigma(K,N,rank=K+10)
+
+output_folder = 'Result_data/empirical convergence'
+os.makedirs(output_folder,exist_ok=True)
+
+_,_,_,times_palm,cost_palm,jisi_palm = titan_iva_g_reg_numpy(X.copy(),track_cost=True,track_jisi=True,gamma_c=1.99,B=A,max_iter_int=15,Winit=Winit.copy(),Cinit=Cinit)
+for k in range(K):
+    Winit[:, :, k] = np.linalg.solve(sc.linalg.sqrtm(Winit[:, :, k] @ Winit[:, :, k].T), Winit[:, :, k])
+_,_,_,jisi_n,times_n = iva_g_numpy(X.copy(),opt_approach='newton',A=A,W_init=Winit.copy(),W_diff_stop=1e-7)
+_,_,_,jisi_v,times_v = iva_g_numpy(X.copy(),opt_approach='gradient',A=A,W_init=Winit.copy())
+
+np.array(times_palm).tofile(output_folder+'/times_palm',sep=',')
+np.array(cost_palm).tofile(output_folder+'/cost_palm',sep=',')
+np.array(jisi_palm).tofile(output_folder+'/jisi_palm',sep=',')
+np.array(times_v).tofile(output_folder+'/times_v',sep=',')
+np.array(jisi_v).tofile(output_folder+'/jisi_v',sep=',')
+np.array(times_n).tofile(output_folder+'/times_n',sep=',')
+np.array(jisi_n).tofile(output_folder+'/jisi_n',sep=',')
+
+
+# exp1 = ComparisonExperimentIvaG('titan vs palm',algos,metaparameters_multiparam,metaparameters_titles_multiparam,
+#                                 common_parameters_1,'multiparam',title_fontsize=50,legend_fontsize=6,N_exp=100,charts=False,legend=False)
 # exp2 = ComparisonExperimentIvaG('palm part 2',algos,metaparameters_multiparam,metaparameters_titles_multiparam,
                                 # common_parameters_2,'multiparam',title_fontsize=50,legend_fontsize=6,N_exp=20,charts=False,legend=False)
-exp1.compute()
+# exp1.compute()
 # exp2.get_data_from_folder('2024-05-16_02-22')
-exp1.make_table()
+# exp1.make_table()
 
 # exp2.make_charts(full=True)
 

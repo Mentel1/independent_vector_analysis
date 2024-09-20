@@ -127,7 +127,7 @@ def _decouple_trick_torch(W, n, Q=None, R=None):
 
 #     return H, Q_, R_
 
-def _bss_isi(W, A, s=None):
+def _bss_isi_torch(W, A, s=None):
     """
     Calculate measure of quality of separation for blind source separation algorithms.
     Model:   x = A @ s,   y = W @ x = W @ A @ s
@@ -179,7 +179,7 @@ def _bss_isi(W, A, s=None):
     # generalized permutation invariant flag (default=False), only used when s is None
     gen_perm_inv_flag = False
 
-    if W.dim() == 2 and A.dim() == 2:
+    if W.ndim == 2 and A.ndim == 2:
         if s is None:
             # Traditional metric, user provided W & A separately
             G = torch.matmul(W, A)
@@ -213,7 +213,7 @@ def _bss_isi(W, A, s=None):
 
         return avg_isi, torch.nan
 
-    elif W.dim() == 3 and A.dim() == 3:
+    elif W.ndim == 3 and A.ndim == 3:
         # IVA/GroupICA/MCCA Metrics
         # For this we want to average over the K groups as well as provide the additional
         # measure of solution to local permutation ambiguity (achieved by averaging the K
@@ -270,6 +270,109 @@ def _bss_isi(W, A, s=None):
 
         for m in range(N):
             joint_isi += torch.sum(G_abs[:, m]) / torch.max(G_abs[:, m]) - 1
+
+        joint_isi /= (2 * N * (N - 1))
+
+        return avg_isi, joint_isi
+    else:
+        raise AssertionError('All inputs must be of either dimension 2 or 3')
+    
+def _bss_isi(W, A, s=None):
+
+    # generalized permutation invariant flag (default=False), only used when s is None
+    gen_perm_inv_flag = False
+
+    if W.ndim == 2 and A.ndim == 2:
+        if s is None:
+            # Traditional metric, user provided W & A separately
+            G = np.matmul(W, A)
+            M, N = G.shape
+            G_abs = np.abs(G)
+            if gen_perm_inv_flag:
+                # normalization by row
+                G_abs /= np.max(G_abs, dim=1, keepdim=True)[0]
+        else:
+            # Equalize energy associated with each estimated source and true source.
+            y = np.matmul(np.matmul(W, A), s)
+            # Standard deviation calculated with n-1
+            D = np.diag(
+                1 / np.std(s, dim=1, unbiased=True))  # s_norm = D @ s, where s_norm has unit variance
+            U = np.diag(
+                1 / np.std(y, dim=1, unbiased=True))  # y_norm = U @ y, where y_norm has unit variance
+
+            # Thus: y_norm = U @ W @ A @ np.linalg.inv(D) @ s_norm = G @ s_norm, and
+            G = np.matmul(np.matmul(U, W), np.linalg.solve(A.t(), D.t())[0].t())  # A @ np.linalg.inv(D)
+            M, N = G.shape
+            G_abs = np.abs(G)
+
+        avg_isi = 0
+        for m in range(M):
+            avg_isi += np.sum(G_abs[m, :]) / np.max(G_abs[m, :]) - 1
+
+        for n in range(N):
+            avg_isi += np.sum(G_abs[:, n]) / np.max(G_abs[:, n]) - 1
+
+        avg_isi /= (2 * N * (N - 1))
+
+        return avg_isi, np.nan
+
+    elif W.ndim == 3 and A.ndim == 3:
+        # IVA/GroupICA/MCCA Metrics
+        # For this we want to average over the K groups as well as provide the additional
+        # measure of solution to local permutation ambiguity (achieved by averaging the K
+        # demixing-mixing matrices and then computing the ISI of this matrix).
+
+        N, M, K = W.shape
+        if M != N:
+            raise AssertionError('This more general case has not been considered here.')
+
+        avg_isi = 0
+        G_abs_total = np.zeros((N, N))
+        G = np.zeros((N, N, K), dtype=W.dtype)
+        for k in range(K):
+            if s is None:
+                # Traditional metric, user provided W & A separately
+                G_k = np.matmul(W[:, :, k], A[:, :, k])
+                G_abs = np.abs(G_k)
+                if gen_perm_inv_flag:
+                    # normalization by row
+                    G_abs /= np.max(G_abs, dim=1, keepdim=True)[0]
+            else:
+
+                # Equalize energy associated with each estimated source and true source.
+                # Standard deviation calculated with n-1
+                y_k = np.matmul(np.matmul(W[:, :, k], A[:, :, k]), s[:, :, k])
+                D_k = np.diag(1 / np.std(s[:, :, k], dim=1,
+                                               unbiased=True))  # s_norm = D @ s, where s_norm has unit variance
+                U_k = np.diag(1 / np.std(y_k, dim=1,
+                                               unbiased=True))  # y_norm = U @ y, where y_norm has unit variance
+                # Thus: y_norm = U @ W @ A @ np.linalg.inv(D) @ s_norm = G @ s_norm, and
+                G_k = np.matmul(np.matmul(U_k, W[:, :, k]), np.linalg.solve(A[:, :, k].t(), D_k.t())[0].t())  # A @ np.linalg.inv(D)
+                G_abs = np.abs(G_k)
+
+            G[:, :, k] = G_k
+
+            G_abs_total += G_abs
+
+            for n in range(N):
+                avg_isi += np.sum(G_abs[n, :]) / np.max(G_abs[n, :]) - 1
+
+            for m in range(N):
+                avg_isi += np.sum(G_abs[:, m]) / np.max(G_abs[:, m]) - 1
+
+        avg_isi /= (2 * N * (N - 1) * K)
+
+        G_abs = np.copy(G_abs_total)
+        if gen_perm_inv_flag:
+            # normalization by row
+            G_abs /= np.max(G_abs, dim=1, keepdim=True)[0]
+
+        joint_isi = 0
+        for n in range(N):
+            joint_isi += np.sum(G_abs[n, :]) / np.max(G_abs[n, :]) - 1
+
+        for m in range(N):
+            joint_isi += np.sum(G_abs[:, m]) / np.max(G_abs[:, m]) - 1
 
         joint_isi /= (2 * N * (N - 1))
 

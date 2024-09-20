@@ -181,7 +181,7 @@ class TitanIvaG(IvaGAlgorithms):
                                      crit_ext=self.crit_ext,crit_int=self.crit_int,nu=self.nu,
                                      max_iter=self.max_iter,max_iter_int=self.max_iter_int,
                                      Winit=Winit,Cinit=Cinit,seed=self.seed,track_jisi=True,B=A)
-        elif self.library == 'troch':
+        elif self.library == 'torch':
              _,_,_,_,jisi = titan_iva_g_reg_torch(X,alpha=self.alpha,gamma_w=self.gamma_w,gamma_c=self.gamma_c,
                                      crit_ext=self.crit_ext,crit_int=self.crit_int,nu=self.nu,
                                      max_iter=self.max_iter,max_iter_int=self.max_iter_int,
@@ -205,29 +205,3 @@ class TitanIvaG(IvaGAlgorithms):
         return times,cost   
     
 
-# N = 10
-# K = 10
-# T = 10000
-# rho_bounds = [0.2,0.3]
-# lambda_ = 0.25
-# epsilon = 1
-# X,A = generate_whitened_problem(T,K,N,epsilon,rho_bounds,lambda_)
-# Winit = make_A(K,N)
-# Cinit = make_Sigma(K,N,rank=K+10)
-
-# output_folder = 'empirical convergence'
-# os.makedirs(output_folder,exist_ok=True)
-
-# _,_,_,times_titan,cost_titan,jisi_titan = titan_iva_g_reg(X.copy(),track_cost=True,track_jisi=True,B=A,max_iter_int=15,Winit=Winit.copy(),Cinit=Cinit)
-# for k in range(K):
-#             Winit[:, :, k] = np.linalg.solve(sc.linalg.sqrtm(Winit[:, :, k] @ Winit[:, :, k].T), Winit[:, :, k])
-# _,_,_,jisi_n,times_n = iva_g(X.copy(),opt_approach='newton',A=A,W_init=Winit.copy(),W_diff_stop=1e-7)
-# _,_,_,jisi_v,times_v = iva_g(X.copy(),opt_approach='gradient',A=A,W_init=Winit.copy())
-
-# np.array(times_titan).tofile(output_folder+'/times_titan',sep=',')
-# np.array(cost_titan).tofile(output_folder+'/cost_titan',sep=',')
-# np.array(jisi_titan).tofile(output_folder+'/jisi_titan',sep=',')
-# np.array(times_v).tofile(output_folder+'/times_v',sep=',')
-# np.array(jisi_v).tofile(output_folder+'/jisi_v',sep=',')
-# np.array(times_n).tofile(output_folder+'/times_n',sep=',')
-# np.array(jisi_n).tofile(output_folder+'/jisi_n',sep=',')

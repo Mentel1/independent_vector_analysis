@@ -1,0 +1,43 @@
+\begin{table}[h!]
+\caption{blablabla}
+\vspace{0.4cm}
+\fontsize{5pt}{5pt}\selectfont
+\begin{tabular}{cm{0.5cm}m{0.5cm}cccccc}
+& & & \multicolumn{2}{c}{$K$ = 5} & \multicolumn{2}{c}{$K$ = 10} & \multicolumn{2}{c}{$K$ = 20}\\
+ \cmidrule(lr){4-5} \cmidrule(lr){6-7} \cmidrule(lr){8-9}
+& & & $N$ = 10 & $N$ = 20 & $N$ = 10 & $N$ = 20 & $N$ = 10 & $N$ = 20\\
+\midrule
+\multirow{12}{*}{\rotatebox[origin=c]{90}{\small{\textbf{PALM-IVA-G}}}}& \multirow{2}{*}{\begin{tabular}{c} Case A \end{tabular}}& $\mu_{\rm jISI}$ & \textbf{9.79E-02} & \textbf{1.36E-01} & \textbf{5.40E-02} & 6.74E-02 & 3.88E-02 & 4.18E-02\\
+& & $\mu_T$ & 3.0 & 23.8 & \textit{\textbf{4.3}} & 41.2 & \textit{\textbf{9.2}} & \textit{\textbf{84.2}}\\
+\cmidrule(lr){2-9}& \multirow{2}{*}{\begin{tabular}{c} Case B \end{tabular}}& $\mu_{\rm jISI}$ & \textbf{2.14E-02} & \textbf{2.20E-02} & \textbf{1.40E-02} & \textbf{1.41E-02} & \textbf{1.13E-02} & \textbf{1.13E-02}\\
+& & $\mu_T$ & \textit{\textbf{0.5}} & 3.1 & \textit{\textbf{0.6}} & \textit{\textbf{3.7}} & \textit{\textbf{1.5}} & \textit{\textbf{8.6}}\\
+\cmidrule(lr){2-9}& \multirow{2}{*}{\begin{tabular}{c} Case C \end{tabular}}& $\mu_{\rm jISI}$ & \textbf{4.63E-02} & 5.29E-02 & 2.51E-02 & 2.63E-02 & 1.70E-02 & 1.70E-02\\
+& & $\mu_T$ & 4.9 & 39.2 & \textit{\textbf{6.6}} & 49.7 & \textit{\textbf{13.6}} & 107.2\\
+\cmidrule(lr){2-9}& \multirow{2}{*}{\begin{tabular}{c} Case D \end{tabular}}& $\mu_{\rm jISI}$ & \textbf{9.45E-03} & \textbf{9.46E-03} & \textbf{6.03E-03} & \textbf{6.03E-03} & \textbf{4.97E-03} & \textbf{4.98E-03}\\
+& & $\mu_T$ & \textit{\textbf{0.7}} & 4.6 & \textit{\textbf{0.9}} & \textit{\textbf{5.6}} & \textit{\textbf{2.4}} & \textit{\textbf{14.9}}\\
+\bottomrule
+\\
+\midrule
+\multirow{12}{*}{\rotatebox[origin=c]{90}{\small{\textbf{IVA-G-V}}}}& \multirow{2}{*}{\begin{tabular}{c} Case A \end{tabular}}& $\mu_{\rm jISI}$ & 1.01E-01 & 1.37E-01 & 5.61E-02 & \textbf{6.64E-02} & \textbf{3.81E-02} & \textbf{4.11E-02}\\
+& & $\mu_T$ & \textit{\textbf{1.8}} & \textit{\textbf{5.4}} & 12.2 & \textit{\textbf{30.4}} & 44.6 & 123.7\\
+\cmidrule(lr){2-9}& \multirow{2}{*}{\begin{tabular}{c} Case B \end{tabular}}& $\mu_{\rm jISI}$ & \textbf{2.15E-02} & \textbf{2.20E-02} & \textbf{1.40E-02} & \textbf{1.41E-02} & \textbf{1.13E-02} & \textbf{1.13E-02}\\
+& & $\mu_T$ & 1.1 & \textit{\textbf{2.3}} & 6.0 & 15.2 & 28.5 & 58.2\\
+\cmidrule(lr){2-9}& \multirow{2}{*}{\begin{tabular}{c} Case C \end{tabular}}& $\mu_{\rm jISI}$ & 4.68E-02 & \textbf{5.03E-02} & \textbf{2.47E-02} & \textbf{2.58E-02} & \textbf{1.63E-02} & \textbf{1.67E-02}\\
+& & $\mu_T$ & \textit{\textbf{1.6}} & \textit{\textbf{4.1}} & 10.1 & \textit{\textbf{21.3}} & 36.0 & \textit{\textbf{86.8}}\\
+\cmidrule(lr){2-9}& \multirow{2}{*}{\begin{tabular}{c} Case D \end{tabular}}& $\mu_{\rm jISI}$ & \textbf{9.48E-03} & \textbf{9.45E-03} & \textbf{6.08E-03} & \textbf{6.07E-03} & \textbf{4.99E-03} & \textbf{5.00E-03}\\
+& & $\mu_T$ & 1.2 & \textit{\textbf{2.6}} & 8.3 & 15.8 & 32.9 & 74.7\\
+\bottomrule
+\\
+\midrule
+\multirow{12}{*}{\rotatebox[origin=c]{90}{\small{\textbf{IVA-G-N}}}}& \multirow{2}{*}{\begin{tabular}{c} Case A \end{tabular}}& $\mu_{\rm jISI}$ & 1.36E-01 & 1.69E-01 & 7.62E-02 & 9.79E-02 & 4.76E-02 & 4.95E-02\\
+& & $\mu_T$ & 25.0 & 82.8 & 76.4 & 285.7 & 234.7 & 1023.5\\
+\cmidrule(lr){2-9}& \multirow{2}{*}{\begin{tabular}{c} Case B \end{tabular}}& $\mu_{\rm jISI}$ & 2.19E-02 & 2.21E-02 & \textbf{1.41E-02} & \textbf{1.41E-02} & \textbf{1.13E-02} & \textbf{1.13E-02}\\
+& & $\mu_T$ & 5.9 & 21.9 & 7.7 & 24.3 & 17.0 & 52.4\\
+\cmidrule(lr){2-9}& \multirow{2}{*}{\begin{tabular}{c} Case C \end{tabular}}& $\mu_{\rm jISI}$ & 5.05E-02 & 5.54E-02 & 2.52E-02 & 2.63E-02 & 1.69E-02 & \textbf{1.67E-02}\\
+& & $\mu_T$ & 19.5 & 89.5 & 36.5 & 138.3 & 81.1 & 304.3\\
+\cmidrule(lr){2-9}& \multirow{2}{*}{\begin{tabular}{c} Case D \end{tabular}}& $\mu_{\rm jISI}$ & \textbf{9.51E-03} & \textbf{9.45E-03} & \textbf{6.08E-03} & \textbf{6.06E-03} & \textbf{4.99E-03} & \textbf{5.00E-03}\\
+& & $\mu_T$ & 1.8 & 6.2 & 2.3 & 6.8 & 6.5 & 17.6\\
+\bottomrule
+\\
+\end{tabular}
+\end{table}
