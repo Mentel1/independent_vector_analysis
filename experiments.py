@@ -76,6 +76,7 @@ from algorithms.titan_iva_g_reg_numpy import *
 #     stats = pstats.Stats(profiler).sort_stats('cumtime')
 #     stats.print_stats()
 
+#=====================================================================================================================================================
 
 # N = 20
 # K = 20
@@ -106,23 +107,23 @@ from algorithms.titan_iva_g_reg_numpy import *
 
 #=====================================================================================================================================================
 
-K = 40
-folder_path = '../../SourceModeling/fMRI_data/'
-filenamebase = 'RegIVA-G_IVAGinit_AssistIVA-G_BAL98_pca_r1-'
-filename = folder_path + filenamebase + '1.mat'
-with h5py.File(filename, 'r') as data:
-    N,V = data['pcasig'][:].shape
-    # print('N = ', N)
+# K = 40
+# folder_path = '../../SourceModeling/fMRI_data/'
+# filenamebase = 'RegIVA-G_IVAGinit_AssistIVA-G_BAL98_pca_r1-'
+# filename = folder_path + filenamebase + '1.mat'
+# with h5py.File(filename, 'r') as data:
+#     N,V = data['pcasig'][:].shape
+#     # print('N = ', N)
     
-X = np.zeros((N,V,K))
+# X = np.zeros((N,V,K))
 
-for k in tqdm(range(K)):
-    filename = folder_path + filenamebase + '{}.mat'.format(k+1)
-    with h5py.File(filename, 'r') as data:
-        # print(list(data.keys())) 
-        X[:,:,k] = data['pcasig'][:]
+# for k in tqdm(range(K)):
+#     filename = folder_path + filenamebase + '{}.mat'.format(k+1)
+#     with h5py.File(filename, 'r') as data:
+#         # print(list(data.keys())) 
+#         X[:,:,k] = data['pcasig'][:]
         
-W,C,_,_ = titan_iva_g_reg_numpy(X,nu=0,gamma_c=1.99)
+# W,C,_,_ = titan_iva_g_reg_numpy(X,nu=0,gamma_c=1.99)
 
 
 # for k in range(K):
