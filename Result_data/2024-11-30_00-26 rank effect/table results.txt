@@ -1,0 +1,15 @@
+\begin{table}[h!]
+\caption{blablabla}
+\vspace{0.4cm}
+\fontsize{5pt}{5pt}\selectfont
+\begin{tabular}{cm{0.5cm}m{0.5cm}ccccccc}
+& & & \multicolumn{1}{c}{$K$ = 5} & \multicolumn{1}{c}{$K$ = 10} & \multicolumn{1}{c}{$K$ = 15} & \multicolumn{1}{c}{$K$ = 20} & \multicolumn{1}{c}{$K$ = 30} & \multicolumn{1}{c}{$K$ = 40} & \multicolumn{1}{c}{$K$ = 50}\\
+ \cmidrule(lr){4-4} \cmidrule(lr){5-5} \cmidrule(lr){6-6} \cmidrule(lr){7-7} \cmidrule(lr){8-8} \cmidrule(lr){9-9} \cmidrule(lr){10-10}
+& & & $N$ = 10 & $N$ = 10 & $N$ = 10 & $N$ = 10 & $N$ = 10 & $N$ = 10 & $N$ = 10\\
+\midrule
+\multirow{3}{*}{\rotatebox[origin=c]{90}{\small{\textbf{PALM-IVA-G}}}}& \multirow{2}{*}{\begin{tabular}{c} Case A \end{tabular}}& $\mu_{\rm jISI}$ & \textbf{6.88E-03} & \textbf{3.25E-03} & \textbf{2.68E-03} & \textbf{2.49E-03} & \textbf{2.39E-03} & \textbf{8.63E-03} & \textbf{1.40E-02}\\
+& & $\mu_T$ & \textit{\textbf{1.2}} & \textit{\textbf{3.1}} & \textit{\textbf{6.1}} & \textit{\textbf{9.1}} & \textit{\textbf{10.6}} & \textit{\textbf{26.5}} & \textit{\textbf{33.3}}\\
+\bottomrule
+\\
+\end{tabular}
+\end{table}

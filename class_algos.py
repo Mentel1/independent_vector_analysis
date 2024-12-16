@@ -143,7 +143,7 @@ class PalmIvaG(IvaGAlgorithms):
 
 class TitanIvaG(IvaGAlgorithms):    
 
-    def __init__(self,color,name='titan',legend='TITAN-IVA-G',nu=0.5,max_iter=20000,max_iter_int=15,max_iter_int_C=1,
+    def __init__(self,color,name='titan',legend='TITAN-IVA-G',nu=0.5,max_iter=1000,max_iter_int=15,max_iter_int_C=1,
                  crit_ext=1e-10,crit_int=1e-10,gamma_w=0.99,gamma_c=1,alpha=1,seed=None,library='numpy',boost=False):
         super().__init__(name=name,legend=legend,color=color,library=library)
         self.crit_int = crit_int

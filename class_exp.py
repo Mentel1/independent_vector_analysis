@@ -5,13 +5,16 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 from time import time
 from algorithms.problem_simulation import *
+import scipy.io
 
 from class_algos import *
    
-def generate_whitened_problem(T,K,N,epsilon=1,rho_bounds=[0.4,0.6],lambda_=0.25): #, idx_W=None):
+def generate_whitened_problem(T,K,N,epsilon=1,rho_bounds=[0,0],lambda_=0.95,rank=None): #, idx_W=None):
     A = make_A(K,N)
     # A = full_to_blocks(A,idx_W,K)
-    Sigma = make_Sigma(K,N,rank=K+10,epsilon=epsilon,rho_bounds=rho_bounds,lambda_=lambda_,seed=None,normalize=False)
+    if rank == None:
+        rank = K+10
+    Sigma = make_Sigma(K,N,rank=rank,epsilon=epsilon,rho_bounds=rho_bounds,lambda_=lambda_,seed=None,normalize=False)
     S = make_S(Sigma,T)
     X = make_X(S,A)
     X_,U = whiten_data_numpy(X)
@@ -250,10 +253,12 @@ class ComparisonExperimentIvaG:
                         elif self.mode == 'multiparam':
                             rho_bounds,lambda_ = metaparam
                             X,A = generate_whitened_problem(self.T,K,N,rho_bounds=rho_bounds,lambda_=lambda_)
+                        elif self.mode == 'effective rank':
+                            X,A = generate_whitened_problem(self.T,K,N,rank=metaparam)
                         Datasets[exp,:,:,:] = X
                         Mixing[exp,:,:,:] = A
                         Winits[exp,:,:,:] = make_A(K,N)
-                        Cinits[exp,:,:,:] = make_Sigma(K,N,rank=K+10)
+                        Cinits[exp,:,:,:] = make_Sigma(K,N,rank=K+10) #do we bring this rank into question ?
                         for algo in self.algos:
                             algo.fill_experiment(X,A,(a,ik,jn,exp),Winits[exp,:,:,:].copy(),Cinits[exp,:,:,:].copy())
                             print(a,' K =',K,' N =',N,algo.name,' : ',algo.results[a,ik,jn,exp],algo.times[a,ik,jn,exp])
@@ -303,7 +308,23 @@ class ComparisonExperimentIvaG:
             fig_global.savefig(output_path,dpi=200)     
 
 
-
+class ApplicationToRealData:
+    
+    def __init__(self,data_path,algos):
+        
+        self.algos = algos
+        self.data_path = data_path
+        self.data = scipy.io.loadmat(data_path)
+        self.X =  None #A changer 
+        
+    def define_order(self,method):
+        pass
+    
+    def solve(self):
+        for algo in self.algos:
+            W,_,_,_ = algo.solve(self.X,Winit=None,C_init=None)
+        
+        
     
 
 

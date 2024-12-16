@@ -130,8 +130,11 @@ def titan_iva_g_reg_numpy(X,alpha=1,gamma_c=1,gamma_w=0.99,max_iter=20000,
     alpha, gamma_c, gamma_w = to_float64(alpha, gamma_c, gamma_w)
     # if (not adaptative_gamma_w) and gamma_w > 1:
     #     raise('gamma_w must be in (0,1) if not adaptative')
+    print('le calcul de Rx commence')
     Rx = np.einsum('NTK,MTJ->KJNM',X,X)/T
+    print('fini, maintenant on calcule rho_Rx')
     rho_Rx = spectral_norm_extracted_numpy(Rx,K,N)
+    print('voilà')
     #Empiriquement, prend des valeurs entre 1 et 3 après whitening
     W,C = initialize(N,K,init_method=init_method,Winit=Winit,Cinit=Cinit,X=X,Rx=Rx,seed=seed)
     l_sup = max((gamma_w*alpha)/(1-gamma_w),rho_Rx*2*K*(1+np.sqrt(2/(alpha*gamma_c))))
@@ -173,6 +176,7 @@ def titan_iva_g_reg_numpy(X,alpha=1,gamma_c=1,gamma_w=0.99,max_iter=20000,
         #     Hess = np.reshape(Hess,(N,N*K,N*K))
         #     c_w = gamma_w/np.max(np.linalg.norm(Hess,ord=2,axis=(1,2)))
         # gamma_w = gamma_w0
+        print(N_step)
         while diff_int > crit_int and N_step_int_W < max_iter_int:
             # W_old = W.copy() 
             beta_w = (1-gamma_w)*np.sqrt(C0*nu*(1-nu)*L_w_prev/L_w)
@@ -225,7 +229,6 @@ def titan_iva_g_reg_numpy(X,alpha=1,gamma_c=1,gamma_w=0.99,max_iter=20000,
             jISI.append(joint_isi_numpy(W,B))
         times.append(time()-t0)
         N_step += 1
-    # print(N_step)
     return report_variables(W,C,N_step,max_iter,times,cost,jISI,diffs_W,diffs_C,track_diff,track_cost,track_jisi,shifts_W)
 
 def block_titan_palm_iva_g_reg(X,idx_W,alpha=1,gamma_c=1,gamma_w=0.99,C0=0.999,nu=0.5,

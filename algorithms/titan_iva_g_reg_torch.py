@@ -176,11 +176,12 @@ def palm_iva_g_reg(X,alpha=1,gamma_c=1.99,gamma_w=0.99,max_iter=5000,
     return report_variables(W,C,N_step,max_iter,cost,ISI,diffs_W,diffs_C,track_diff,track_cost,track_isi)
 
 def titan_iva_g_reg_torch(X,alpha=1,gamma_c=1,gamma_w=0.99,max_iter=20000,
-                         max_iter_int=100,crit_int=1e-7,crit_ext=1e-10,init_method='random',Winit=None,Cinit=None,
+                         max_iter_int=100,crit_int=1e-10,crit_ext=1e-10,init_method='random',
+                         Winit=None,Cinit=None,
                          eps=10**(-12),track_cost=False,seed=None,
-                         track_isi=False,track_diff=False,B=None,nu=0.5,zeta = 1e-3,
+                         track_jisi=False,track_diff=False,B=None,nu=0.5,zeta = 1e-3,
                          max_iter_int_C=1,adaptative_gamma_w=False,
-                         gamma_w_decay=0.9):
+                         gamma_w_decay=0.9,boost=False):
     X = torch.from_numpy(X)
     if Winit is not None:
         Winit = torch.tensor(Winit)
@@ -191,13 +192,11 @@ def titan_iva_g_reg_torch(X,alpha=1,gamma_c=1,gamma_w=0.99,max_iter=20000,
     alpha, gamma_c, gamma_w = torch.tensor(alpha), torch.tensor(gamma_c), torch.tensor(gamma_w)
 
     # if (not adaptative_gamma_w) and gamma_w > 1:
-    #     raise('gamma_w must be in ]0,1[ if not adaptative')
+    #     raise('gamma_w must be in (0,1) if not adaptative')
     N,T,K = X.size()
-    Rx = torch.einsum('NTK,MTJ->KJNM', X, X) / T
+    Rx = torch.einsum('NTK,MTJ->KJNM',X,X)/T
     rho_Rx = spectral_norm_extracted_torch(Rx,K,N)
-    
     W,C = initialize(N,K,init_method=init_method,Winit=Winit,Cinit=Cinit,X=X,Rx=Rx,seed=seed)
-
     l_sup = max((gamma_w*alpha)/(1-gamma_w),rho_Rx*2*K*(1+torch.sqrt(2/(alpha*gamma_c))))
     C0 = min(gamma_c**2/K**2,alpha*gamma_w/((1+zeta)*(1 - gamma_w)*l_sup),rho_Rx/((1+zeta)*l_sup))
     l_inf = (1+zeta)*C0*l_sup
@@ -206,17 +205,16 @@ def titan_iva_g_reg_torch(X,alpha=1,gamma_c=1,gamma_w=0.99,max_iter=20000,
     c_c = gamma_c/alpha
     beta_c = torch.sqrt(C0*nu*(1-nu))
     tau_c = beta_c
-
     #On initialise les listes utiles pour tracer les courbes. Par défaut on garde les critères pour les deux blocs, on pourra calculer le max a posteriori si besoin
     diffs_W,diffs_C,ISI,cost,shifts_W = [],[],[],[],[]
     # shift_W = 1
     if track_cost:
         cost = [cost_iva_g_reg(W,C,Rx,alpha)]
-    if track_isi:
+    if track_jisi:
         if np.any(B == None):
-            raise("you must provide B to track ISI")
+            raise("you must provide B to track jISI")
         else:
-            ISI = [joint_isi_torch(W,B)]
+            jISI = [joint_isi_torch(W,B)]
     diff_ext = np.inf
     L_w = max(l_inf,lipschitz(C,rho_Rx))
     #print('L_w device :',L_w.device)
@@ -233,10 +231,10 @@ def titan_iva_g_reg_torch(X,alpha=1,gamma_c=1,gamma_w=0.99,max_iter=20000,
         W_old0 = W.clone()
         N_step_int_W = 0
         N_step_int_C = 0 #here
+        c_w = gamma_w/L_w
         # gamma_w = gamma_w0
         while diff_int > crit_int and N_step_int_W < max_iter_int:
             # W_old = W.clone()
-            c_w = gamma_w/L_w
             beta_w = (1-gamma_w)*torch.sqrt(C0*nu*(1-nu)*L_w_prev/L_w)
             tau_w = beta_w
             W_tilde = W + beta_w*(W-W_prev)
@@ -262,7 +260,7 @@ def titan_iva_g_reg_torch(X,alpha=1,gamma_c=1,gamma_w=0.99,max_iter=20000,
                 # if shift_W > 0.99:
                 #     gamma_w = gamma_w/gamma_w_decay
             # if diff_criteria(W,W_old) < W_diff_stop:
-            #     return report_variables(W,C,N_step,max_iter,cost,ISI,diffs_W,diffs_C,track_diff,track_cost,track_isi)    
+            #     return report_variables(W,C,N_step,max_iter,cost,jISI,diffs_W,diffs_C,track_diff,track_cost,track_jisi)    
         # print(N_step_int)
         # if track_cost:
         #     cost.append(cost_iva_g_reg(W,C,Lambda,alpha))
@@ -286,11 +284,11 @@ def titan_iva_g_reg_torch(X,alpha=1,gamma_c=1,gamma_w=0.99,max_iter=20000,
         # if track_diff:
         #     diffs_W.append(diff_W)
             # diffs_C.append(diff_C)
-        if track_isi:
-            ISI.append(joint_isi_torch(W,B))
+        if track_jisi:
+            jISI.append(joint_isi_torch(W,B))
         times.append(time()-t0)
         N_step += 1
-    return report_variables(W,C,N_step,max_iter,times,cost,ISI,diffs_W,diffs_C,track_diff,track_cost,track_isi,shifts_W)
+    return report_variables(W,C,N_step,max_iter,times,cost,jISI,diffs_W,diffs_C,track_diff,track_cost,track_jisi,shifts_W)
 
 
 def block_titan_palm_iva_g_reg(X,idx_W,alpha=1,gamma_c=1,gamma_w=0.99,C0=0.999,nu=0.5,
@@ -396,7 +394,7 @@ def to_float64(alpha, gamma_c, gamma_w):
     gamma_c = np.float64(gamma_c)
     return alpha,gamma_c,gamma_w
 
-def report_variables(W,C,N_step,max_iter,times,cost,ISI,diffs_W,diffs_C,track_diff,track_cost,track_isi,shifts_W):
+def report_variables(W,C,N_step,max_iter,times,cost,jISI,diffs_W,diffs_C,track_diff,track_cost,track_isi,shifts_W):
     if N_step < max_iter:
         met_limit = True
     else:
@@ -406,23 +404,23 @@ def report_variables(W,C,N_step,max_iter,times,cost,ISI,diffs_W,diffs_C,track_di
         diffs = diffs_W
         if track_cost:
             if track_isi:
-                return W,C,met_limit,times,cost,ISI,diffs
+                return W,C,met_limit,times,cost,jISI,diffs
             else:
                 return W,C,met_limit,times,cost,diffs
         else:
             if track_isi:
-                return W,C,met_limit,times,ISI,diffs
+                return W,C,met_limit,times,jISI,diffs
             else:
                 return W,C,met_limit,times,diffs
     else:
         if track_cost:
             if track_isi:
-                return W,C,met_limit,times,cost,ISI
+                return W,C,met_limit,times,cost,jISI
             else:
                 return W,C,met_limit,times,cost
         else:
             if track_isi:
-                return W,C,met_limit,times,ISI #,shifts_W
+                return W,C,met_limit,times,jISI #,shifts_W
             else:
                 return W,C,met_limit,times
             
