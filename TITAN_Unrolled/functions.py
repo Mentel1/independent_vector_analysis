@@ -144,6 +144,16 @@ def initialize(N, K, B, init_method='random', Winit=None, Cinit=None, X=None, Rx
         W = torch.stack([make_A(K, N, seed=seed) for _ in range(B)], dim=0)
         C = torch.stack([make_Sigma(K, N, rank=K+10, seed=seed) for _ in range(B)], dim=0)
 
+    elif init_method == 'identity':
+
+        print("Initializing with identity matrices with small noise")
+
+        # Ajout d'un petit bruit aléatoire à la matrice identité pour éviter NaNs
+        noise_level = 1e-3  # Petite valeur pour ne pas perturber la structure
+        W = torch.eye(N).unsqueeze(-1).expand(B, N, N, K) + noise_level * torch.randn(B, N, N, K)
+        C = torch.eye(K).unsqueeze(-1).expand(B, K, K, N) + noise_level * torch.randn(B, K, K, N)
+
+
     W = W.cuda()
     C = C.cuda()
 

@@ -144,7 +144,7 @@ class W_iter(nn.Module):
     def inertial_step(self,beta_w,W,W_old):
         #print("W shape",W.shape)
         #print("beta_w shape",beta_w.shape)
-        beta_w = beta_w.view(-1, 1, 1, 1)
+        #beta_w = beta_w.view(-1, 1, 1, 1)
         W = W + beta_w * (W - W_old)
         return W
     
@@ -187,7 +187,7 @@ class C_iter(nn.Module):
         self.mode = learning_mode
 
     def inertial_step(self,beta_c,C,C_old):
-        beta_c = beta_c.view(-1, 1, 1, 1)
+        #beta_c = beta_c.view(-1, 1, 1, 1)
         C = C + beta_c * (C - C_old)
         return C
     
@@ -249,10 +249,9 @@ class Block(nn.Module):
         self.W_iter = W_iter(N_updates_W,learning_mode)
         self.C_iter = C_iter(N_updates_C,learning_mode)
 
-        #self.alpha = nn.Parameter(torch.FloatTensor([1]).cuda())
-        self.alpha = nn.Parameter(torch.empty(1).cuda())
-
-        torch.nn.init.normal_(self.alpha, mean=0, std=0.01)
+        self.alpha = nn.Parameter(torch.FloatTensor([np.log(np.exp(1) - 1)]).cuda())
+        #self.alpha = nn.Parameter(torch.empty(1).cuda())
+        #torch.nn.init.normal_(self.alpha, mean=0, std=5)
 
         # Manually apply He initialization for a scalar
         #std = math.sqrt(2.)  # Typical scale factor for He initialization
@@ -260,26 +259,39 @@ class Block(nn.Module):
             #self.alpha.normal_(0, std)
 
         if learning_mode == 'with_inertial':
-            self.gamma_w = nn.Parameter(torch.FloatTensor([0.5]).cuda())
-            self.gamma_c = nn.Parameter(torch.FloatTensor([0.5]).cuda())
+            self.gamma_w = nn.Parameter(torch.empty(1).cuda())
+            torch.nn.init.normal_(self.gamma_w, mean=0, std=5)
+            self.gamma_c = nn.Parameter(torch.empty(1).cuda())
+            torch.nn.init.normal_(self.gamma_c, mean=0, std=5)
+
             self.beta_w = nn.Parameter(torch.empty(1).cuda())
             self.beta_c = nn.Parameter(torch.empty(1).cuda())
 
-            torch.nn.init.normal_(self.beta_w, mean=0, std=0.01)
-            torch.nn.init.normal_(self.beta_c, mean=0, std=0.01)
+            torch.nn.init.normal_(self.beta_w, mean=0, std=5)
+            torch.nn.init.normal_(self.beta_c, mean=0, std=5)
             #torch.nn.init.uniform_(self.beta_w, a=-1, b=1)
             #print("beta_w",self.beta_w)
             #torch.nn.init.uniform_(self.beta_c, a=-1, b=1) 
             #print("beta_c",self.beta_c)
 
         elif learning_mode == 'no_inertial':
-            self.gamma_w = nn.Parameter(torch.FloatTensor([1]).cuda())
-            self.gamma_c = nn.Parameter(torch.FloatTensor([1]).cuda())
+
+            self.gamma_w = nn.Parameter(torch.empty(1).cuda())
+            torch.nn.init.normal_(self.gamma_w, mean=-1.289, std=0.1)
+
+            self.gamma_c = nn.Parameter(torch.empty(1).cuda())
+            torch.nn.init.normal_(self.gamma_c, mean=-1.289, std=0.1)
+
+            """ self.gamma_w = nn.Parameter(torch.empty(1).cuda())
+            torch.nn.init.constant_(self.gamma_w, -1.289)  # Assure que gamma_w = 1
+
+            self.gamma_c = nn.Parameter(torch.empty(1).cuda())
+            torch.nn.init.constant_(self.gamma_c, -1.289)  # Assure que gamma_c = 1 """
 
         else:
             self.gamma_w = gamma_w
             self.gamma_c = gamma_c
-         
+        
         self.softplus = nn.Softplus()
         self.relu = nn.ReLU()
         self.tanh = nn.Tanh()
@@ -288,6 +300,7 @@ class Block(nn.Module):
         self.nu = nu
         self.zeta = zeta
         self.learning_mode = learning_mode
+        self.param_scale = 5.0
     
     def get_coefficients(self,rho_Rx,alpha,C,C_i_1):
 
@@ -354,23 +367,26 @@ class Block(nn.Module):
 
         alpha = self.softplus(self.alpha)
         #print("alpha",alpha)
-
+    
     
         #print("alpha shape",alpha.shape)
         #alpha = self.NN_alpha(W,C)
         #alpha = torch.tensor(1.0,requires_grad=True)
 
         if self.learning_mode == 'with_inertial':
-            gamma_w = 0.3 + 2 * (self.tanh(self.gamma_w) + 1)  # gamma_w in [0.3, 10.3]
-            gamma_c = 0.3 + 2 * (self.tanh(self.gamma_c) + 1)  # gamma_c in [0.3, 10.3]
+            gamma_w = 0.3 + 5 * (self.tanh(self.gamma_w) + 1)  # gamma_w in [0.3, 10.3]
+            gamma_c = 0.3 + 5 * (self.tanh(self.gamma_c) + 1)  # gamma_c in [0.3, 10.3]
+            beta_w = self.sigmoid(self.beta_w)
+            beta_c = self.sigmoid(self.beta_c)
             c_w = gamma_w / lipschitz(C, rho_Rx)
             c_c = gamma_c / alpha
-            beta_w = self.softplus(self.beta_w)
-            beta_c = self.softplus(self.beta_c)
+
 
         elif self.learning_mode == 'no_inertial':
             gamma_w = 0.3 + 5 * (self.tanh(self.gamma_w) + 1)  # gamma_w in [0.3, 10.3]
             gamma_c = 0.3 + 5 * (self.tanh(self.gamma_c) + 1)  # gamma_c in [0.3, 10.3]
+            #gamma_w = self.softplus(self.gamma_w)
+            #gamma_c = self.softplus(self.gamma_c)
             c_w = gamma_w / lipschitz(C,rho_Rx)
             c_c = gamma_c / alpha
             beta_w = 0
@@ -390,6 +406,63 @@ class Block(nn.Module):
 
 
 
+
+
+class Block_tied(nn.Module):
+
+    """
+    One layer in U_TITAN.
+    Attributes
+    ----------
+        nn_bar                           (Cnn_bar): computes the barrier parameter
+        soft                    (torch.nn.Softplus): Softplus activation function
+        gamma                (torch.nn.FloatTensor): stepsize, size 1 
+        reg_mul,reg_constant (torch.nn.FloatTensor): parameters for estimating the regularization parameter, size 1
+        delta                               (float): total variation smoothing parameter
+        IPIter                             (IPIter): computes the next proximal interior point iterate
+    """
+
+
+    def __init__(self,K,N,input_dim, N_updates_W,N_updates_C,gamma_c,gamma_w,eps,nu,zeta,learning_mode):
+    
+        super().__init__()
+        self.W_iter = W_iter(N_updates_W,learning_mode)
+        self.C_iter = C_iter(N_updates_C,learning_mode)
+        self.eps = eps
+        self.learning_mode = learning_mode
+
+
+
+    def forward(self,Rx,rho_Rx,W,W_j_1,C,C_j_1,C_i_1,alpha,gamma_w,gamma_c):
+        """
+        Computes the next iterate, output of the layer.
+        Parameters
+        ----------
+      	    x            (torch.nn.FloatTensor): previous iterate, size n*c*h*w
+            Ht_x_blurred (torch.nn.FloatTensor): Ht*degraded image, size n*c*h*w
+            std_approx   (torch.nn.FloatTensor): approximate noise standard deviation, size n*1
+            save_gamma_mu_lambda          (str): indicates if the user wants to save the values of the estimated hyperparameters, 
+                                                 path to the folder to save the hyperparameters values or 'no' 
+        Returns
+        -------
+       	    (torch.FloatTensor): next iterate, output of the layer, n*c*h*w
+        """
+
+        c_w = gamma_w / lipschitz(C,rho_Rx)
+        c_c = gamma_c / alpha
+        beta_w = 0
+        beta_c = 0
+
+        W, W_j_1  = self.W_iter(Rx, W, W_j_1, C, c_w, beta_w)
+        C, C_j_1, C_i_1  = self.C_iter(Rx, C, C_j_1, W, c_c, beta_c, alpha, self.eps)
+
+        return W, W_j_1, C,  C_j_1, C_i_1
+
+
+
+
+
+
 class myModel(nn.Module):
     """
     U_TITAN model.
@@ -397,10 +470,24 @@ class myModel(nn.Module):
     ----------
         blocks (list): list of Blocks
     """
-    def __init__(self,K,N,input_dim, N_updates_W,N_updates_C,num_layers,gamma_c,gamma_w,eps,nu,zeta,learning_mode):
+    def __init__(self,model_name,K,N,input_dim, N_updates_W,N_updates_C,num_layers,gamma_c,gamma_w,eps,nu,zeta,learning_mode):
         super().__init__()
-        self.Layers = nn.ModuleList([Block(K,N,input_dim,N_updates_W,N_updates_C,gamma_c,gamma_w,eps,nu,zeta,learning_mode) for _ in range(num_layers)])
-        self.isi_scores = []
+
+
+        self.model_name = model_name
+        if self.model_name == 'U_PALM_tied':
+            self.alpha = nn.Parameter(torch.FloatTensor([np.log(np.exp(1) - 1)]).cuda())
+            self.gamma_w = nn.Parameter(torch.empty(1).cuda())
+            torch.nn.init.normal_(self.gamma_w, mean=0, std=5)
+            self.gamma_c = nn.Parameter(torch.empty(1).cuda())
+            torch.nn.init.normal_(self.gamma_c, mean=-1.289, std=0.1)
+
+            self.Layers = nn.ModuleList([Block_tied(K,N,input_dim,N_updates_W,N_updates_C,gamma_c,gamma_w,eps,nu,zeta,learning_mode) for _ in range(num_layers)])
+        else:
+            self.Layers = nn.ModuleList([Block(K,N,input_dim,N_updates_W,N_updates_C,gamma_c,gamma_w,eps,nu,zeta,learning_mode) for _ in range(num_layers)])
+        self.isi_scores = [0]*num_layers
+        self.softplus = nn.Softplus()
+        self.tanh = nn.Tanh()
 
 
 
@@ -424,7 +511,7 @@ class myModel(nn.Module):
         Rx = cov_X(X)
         rho_Rx = spectral_norm_extracted(Rx,K,N)
         #print("Rx shape",Rx.shape)
-        W,C = initialize(N,K,B)
+        W,C = initialize(N,K,B,init_method='random')
         
 
 
@@ -437,20 +524,29 @@ class myModel(nn.Module):
             C_i_1 = C.clone()
             C_j_1 = C.clone()
             for i in range(len(self.Layers)):
-                #alpha = self.soft(self.alphas[i])
-                #assert self.Layers[i].alpha.requires_grad, f"alpha {i} does not require grad"
-                W,W_j_1,C,C_j_1,C_i_1 = self.Layers[i](Rx,rho_Rx,W,W_j_1,C,C_j_1,C_i_1)
-                #print("W",W)
-                #print("ISI Score Layer ",i+1,": ",ISI_loss()(W, A))
+
+                if self.model_name == 'U_PALM_tied':
+                    alpha = self.softplus(self.alpha)
+                    gamma_w = 0.3 + 5 * (self.tanh(self.gamma_w) + 1)  # gamma_w in [0.3, 10.3]
+                    gamma_c = 0.3 + 5 * (self.tanh(self.gamma_c) + 1)  # gamma_c in [0.3, 10.3]
+                    W,W_j_1,C,C_j_1,C_i_1 = self.Layers[i](Rx,rho_Rx,W,W_j_1,C,C_j_1,C_i_1,alpha,gamma_w,gamma_c)
+                else:
+                    W,W_j_1,C,C_j_1,C_i_1 = self.Layers[i](Rx,rho_Rx,W,W_j_1,C,C_j_1,C_i_1)
+                    #print("W",W)
+                    #print("ISI Score Layer ",i+1,": ",ISI_loss()(W, A))
         
         elif mode=='test':
             W_j_1 = W.clone()
             C_i_1 = C.clone()
             C_j_1 = C.clone()
+            isi_scores_current_batch = []
             for i in range(len(self.Layers)):
                 W,W_j_1,C,C_j_1,C_i_1 = self.Layers[i](Rx,rho_Rx,W.detach(),W_j_1.detach(),C.detach(),C_j_1.detach(),C_i_1.detach())
                 #print("ISI Score Layer ",i+1,": ",joint_isi(W, A))
-                self.isi_scores.append(ISI_loss()(W, A))
+                isi_scores_current_batch.append(ISI_loss()(W, A).item())
+                
+            self.isi_scores = [a+b for a,b in zip(self.isi_scores,isi_scores_current_batch)]
+            print("ISI Scores: ",self.isi_scores)
 
         return W,C         
     
