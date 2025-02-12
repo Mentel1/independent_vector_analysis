@@ -38,7 +38,7 @@ class U_TITAN(nn.Module):
 
     """
 
-    def __init__(self, folders, mode, T, K, N, input_dim, lr, N_updates_W, N_updates_C, num_epochs, batch_size, dataset_size, num_layers, gamma_c, gamma_w, eps, nu, zeta, learning_mode):
+    def __init__(self, folders, model_name, mode, T, K, N, input_dim, lr, N_updates_W, N_updates_C, num_epochs, batch_size, dataset_size, num_layers, gamma_c, gamma_w, eps, nu, zeta, learning_mode):
             """
             Parameters
             ----------
@@ -66,6 +66,7 @@ class U_TITAN(nn.Module):
             self.K = K
             self.N = N
             self.input_dim = input_dim
+            self.model_name = model_name
             self.size = dataset_size
             self.path_test, self.path_train, self.path_val, self.path_save = folders
             self.mode  = mode #'first_layer' or 'greedy' or 'last_layers_lpp' or 'test'
@@ -75,14 +76,13 @@ class U_TITAN(nn.Module):
             self.num_layers = num_layers
             self.batch_size = batch_size 
             self.dtype = torch.cuda.FloatTensor
-            self.model = myModel(K,N,input_dim, N_updates_W, N_updates_C, num_layers=num_layers, gamma_c=gamma_c, gamma_w=gamma_w, eps=eps, nu=nu, zeta=zeta,learning_mode=learning_mode).cuda()
+            self.model = myModel(model_name,K,N,input_dim, N_updates_W, N_updates_C, num_layers=num_layers, gamma_c=gamma_c, gamma_w=gamma_w, eps=eps, nu=nu, zeta=zeta,learning_mode=learning_mode).cuda()
             self.loss_fun = ISI_loss()
             self.isi_train   =  np.zeros(self.num_epochs)
             self.isi_val     =  np.zeros(self.num_epochs)
             self.isi_test    =  []
             self.test_mean_time_per_data = 0
             self.test_mean_time_per_batch = 0
-            self.batch_times = []
 
 
 
@@ -136,12 +136,12 @@ class U_TITAN(nn.Module):
             print(f'=================== End-to-end training ===================')
             # to store results 
 
-            loss_min_val      =  float('Inf')
+            loss_min_val = float('Inf')
             #self.CreateFolders(training_number)
             #folder = os.path.join(self.path_save,'Layer_'+str(layer))
             self.CreateLoader() 
             # defines the optimizer
-            optimizer = torch.optim.Adam(self.parameters(),lr=self.lr)
+            optimizer = torch.optim.Adam(self.parameters(),lr=self.lr,weight_decay=1e-3)
             # Initialize learning rate scheduler
             #scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
             scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=10, verbose=True)       
@@ -192,19 +192,19 @@ class U_TITAN(nn.Module):
                     #torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
 
                     # Debugging: Check for NaNs in gradients
-                    for name, param in self.model.named_parameters():
+                    """ for name, param in self.model.named_parameters():
                         if param.grad is not None and torch.isnan(param.grad).any():
                             print(f"NaNs detected in gradients of {name} at epoch {epoch}, batch {i+1}")
                             return
 
-                    """                     for name, param in self.model.named_parameters():
+                    for name, param in self.model.named_parameters():
                         if param.grad is None:
                             print(f"Parameter '{name}' has no gradient")
                         else:
                             print(f"Parameter '{name}' gradient mean: {param.grad.mean().item()}") 
-                            print(f"Parameter '{name}' value: {param.mean().item()}") """ 
+                            print(f"Parameter '{name}' value: {param.mean().item()}")  """
 
-                    torch.nn.utils.clip_grad_value_(self.model.parameters(), clip_value=1e-6)
+                    torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
                     optimizer.step()
                     #print(f"batch {i} done")
                     #print(f"Memory allocated: {torch.cuda.memory_allocated() / 1e9} GB")    
@@ -277,6 +277,7 @@ class U_TITAN(nn.Module):
             # Evaluation mode
             self.model.eval()
             
+            batch_times = []
             isi_scores = []
 
             
@@ -284,7 +285,7 @@ class U_TITAN(nn.Module):
                 for minibatch in tqdm(loader, file=sys.stdout):
                     
                     print("\n")
-                    print("minibatch: ", minibatch[0].shape)
+                    #print("minibatch: ", minibatch[0].shape)
                     X, A = minibatch
 
                     if torch.isinf(X).any() or torch.isinf(A).any():
@@ -309,11 +310,13 @@ class U_TITAN(nn.Module):
                     isi_score = self.loss_fun(W_predicted, A)
                     print(f'ISI Score for current batch: {isi_score:.4f}')
                     print(f'Time for current batch: {batch_time:.5f} seconds')
-                    self.batch_times.append(batch_time)
+                    batch_times.append(batch_time)
                     isi_scores.append(isi_score * len(X))
 
                 
                 
+                self.model.isi_scores = [score / 100 for score in self.model.isi_scores]
+
 
 
                 # Calculer le score ISI moyen
@@ -322,7 +325,7 @@ class U_TITAN(nn.Module):
                 mean_isi_score = sum(isi_scores) / len(loader.dataset)
 
                 # Calculer le temps moyen par donnée et par lot
-                total_time = sum(self.batch_times)
+                total_time = sum(batch_times)
                 self.test_mean_time_per_data = total_time / len(loader.dataset)
                 self.test_mean_time_per_batch = total_time / len(loader)
                 print("\n")
