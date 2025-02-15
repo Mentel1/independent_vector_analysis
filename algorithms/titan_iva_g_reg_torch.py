@@ -182,7 +182,8 @@ def titan_iva_g_reg_torch(X,alpha=1,gamma_c=1,gamma_w=0.99,max_iter=20000,
                          track_jisi=False,track_diff=False,B=None,nu=0.5,zeta = 1e-3,
                          max_iter_int_C=1,adaptative_gamma_w=False,
                          gamma_w_decay=0.9,boost=False):
-    X = torch.from_numpy(X)
+    if not torch.is_tensor(X):
+        X = torch.from_numpy(X)
     if Winit is not None:
         Winit = torch.tensor(Winit)
     if Cinit is not None:
@@ -197,8 +198,11 @@ def titan_iva_g_reg_torch(X,alpha=1,gamma_c=1,gamma_w=0.99,max_iter=20000,
     Rx = torch.einsum('NTK,MTJ->KJNM',X,X)/T
     rho_Rx = spectral_norm_extracted_torch(Rx,K,N)
     W,C = initialize(N,K,init_method=init_method,Winit=Winit,Cinit=Cinit,X=X,Rx=Rx,seed=seed)
-    l_sup = max((gamma_w*alpha)/(1-gamma_w),rho_Rx*2*K*(1+torch.sqrt(2/(alpha*gamma_c))))
-    C0 = min(gamma_c**2/K**2,alpha*gamma_w/((1+zeta)*(1 - gamma_w)*l_sup),rho_Rx/((1+zeta)*l_sup))
+    l_sup = torch.max((gamma_w*alpha)/(1-gamma_w),rho_Rx*2*K*(1+torch.sqrt(2/(alpha*gamma_c))))
+    # Utiliser torch.minimum pour trouver le minimum entre deux tenseurs à la fois
+    C0_tmp = torch.minimum(gamma_c**2 / K**2, alpha * gamma_w / ((1 + zeta) * (1 - gamma_w) * l_sup))
+    C0 = torch.minimum(C0_tmp, rho_Rx / ((1 + zeta) * l_sup))
+    # C0 = torch.min(gamma_c**2/K**2,alpha*gamma_w/((1+zeta)*(1 - gamma_w)*l_sup),rho_Rx/((1+zeta)*l_sup))
     l_inf = (1+zeta)*C0*l_sup
     C_lat,C_bar,C_tilde,C_prev,W_lat,W_bar,W_tilde,W_prev = C.clone(),C.clone(),C.clone(),C.clone(),W.clone(),W.clone(),W.clone(),W.clone()
     N_step = 0
@@ -215,8 +219,10 @@ def titan_iva_g_reg_torch(X,alpha=1,gamma_c=1,gamma_w=0.99,max_iter=20000,
             raise("you must provide B to track jISI")
         else:
             jISI = [joint_isi_torch(W,B)]
+    else:
+        jISI = []
     diff_ext = np.inf
-    L_w = max(l_inf,lipschitz(C,rho_Rx))
+    L_w = torch.max(l_inf,lipschitz(C,rho_Rx))
     #print('L_w device :',L_w.device)
     times = [0]
     t0 = time()
@@ -225,7 +231,7 @@ def titan_iva_g_reg_torch(X,alpha=1,gamma_c=1,gamma_w=0.99,max_iter=20000,
     while diff_ext > crit_ext and N_step < max_iter:
         C_old0 = C.clone()
         L_w_prev = L_w
-        L_w = max(l_inf,lipschitz(C,rho_Rx))
+        L_w = torch.max(l_inf,lipschitz(C,rho_Rx))
         diff_int = np.inf
         diff_int_C = np.inf #here
         W_old0 = W.clone()

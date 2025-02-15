@@ -3,7 +3,7 @@
 
 # Setuptools distribution folder.
 /dist/
-
+/Datasets/
 # Python egg metadata, regenerated from source files by setuptools.
 /*.egg-info
 
@@ -11,3 +11,6 @@
 pyproject.toml
 build/
 notebooks/.ipynb_checkpoints/
+
+# Ignore the virtual environment folder created by pipenv
+/.venv/

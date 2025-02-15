@@ -152,6 +152,8 @@ def titan_iva_g_reg_numpy(X,alpha=1,gamma_c=1,gamma_w=0.99,max_iter=20000,
             raise("you must provide B to track jISI")
         else:
             jISI = [joint_isi_numpy(W,B)]
+    else:
+        jISI = []
     diff_ext = np.inf
     L_w = max(l_inf,lipschitz_numpy(C,rho_Rx))
     times = [0]
