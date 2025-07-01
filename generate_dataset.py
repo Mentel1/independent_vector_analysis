@@ -28,6 +28,10 @@ def save_dataset(base_path, cases, size, T, K, N, epsilon=1, rho_bounds=[0.4, 0.
     elif cases == 'hard cases':
         rho_bounds = [0.2, 0.7]
         lambda_ = 0.04
+        
+    elif cases == 'structured':
+        rho_bounds = [0.2, 0.7]
+        lambda_ = 0.04
 
 
 
@@ -59,7 +63,7 @@ def save_dataset(base_path, cases, size, T, K, N, epsilon=1, rho_bounds=[0.4, 0.
 # Exemple de génération de données et sauvegarde
 base_path = "Datasets"
 mode = 'train'
-cases = 'easy cases'
+cases = 'structured cases'
 path = os.path.join(base_path, mode, cases)
 size = 1000
 K_values = [20]

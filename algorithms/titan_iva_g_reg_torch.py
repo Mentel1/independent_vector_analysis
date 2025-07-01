@@ -199,6 +199,7 @@ def titan_iva_g_reg_torch(X,alpha=1,gamma_c=1,gamma_w=0.99,max_iter=20000,
     rho_Rx = spectral_norm_extracted_torch(Rx,K,N)
     W,C = initialize(N,K,init_method=init_method,Winit=Winit,Cinit=Cinit,X=X,Rx=Rx,seed=seed)
     l_sup = torch.max((gamma_w*alpha)/(1-gamma_w),rho_Rx*2*K*(1+torch.sqrt(2/(alpha*gamma_c))))
+    print(X.dtype,C.dtype,W.dtype,Rx.dtype)
     # Utiliser torch.minimum pour trouver le minimum entre deux tenseurs à la fois
     C0_tmp = torch.minimum(gamma_c**2 / K**2, alpha * gamma_w / ((1 + zeta) * (1 - gamma_w) * l_sup))
     C0 = torch.minimum(C0_tmp, rho_Rx / ((1 + zeta) * l_sup))
@@ -383,7 +384,7 @@ def initialize(N,K,init_method,Winit=None,Cinit=None,X=None,Rx=None,seed=None):
     elif init_method == 'random':
         C = make_Sigma(K,N,rank=K+10,seed=seed)
         W = make_A(K,N,seed=seed)        
-    return W,C
+    return torch.from_numpy(W).float(),torch.from_numpy(C).float()
 
 def Jdiag_init(X,N,K,Rx):
     if K > 2:

@@ -1,0 +1,55 @@
+\begin{table}[h!]
+\caption{blablabla}
+\vspace{0.4cm}
+\fontsize{5pt}{5pt}\selectfont
+\begin{tabular}{cm{0.5cm}m{0.5cm}c}
+& & & \multicolumn{1}{c}{$K$ = 10}\\
+ \cmidrule(lr){4-4}
+& & & $N$ = 10\\
+\midrule
+\multirow{3}{*}{\rotatebox[origin=c]{90}{\small{\textbf{TITAN-IVA-G}}}}& \multirow{2}{*}{\begin{tabular}{c} Case B \end{tabular}}& $\mu_{\rm jISI}$ & \textbf{1.48E-02}\\
+& & $\mu_T$ & 0.8\\
+\bottomrule
+\\
+\midrule
+\multirow{3}{*}{\rotatebox[origin=c]{90}{\small{\textbf{TITAN-IVA-G}}}}& \multirow{2}{*}{\begin{tabular}{c} Case B \end{tabular}}& $\mu_{\rm jISI}$ & 2.02E-02\\
+& & $\mu_T$ & \textit{\textbf{0.6}}\\
+\bottomrule
+\\
+\midrule
+\multirow{3}{*}{\rotatebox[origin=c]{90}{\small{\textbf{TITAN-IVA-G}}}}& \multirow{2}{*}{\begin{tabular}{c} Case B \end{tabular}}& $\mu_{\rm jISI}$ & 5.47E-02\\
+& & $\mu_T$ & 0.9\\
+\bottomrule
+\\
+\midrule
+\multirow{3}{*}{\rotatebox[origin=c]{90}{\small{\textbf{TITAN-IVA-G}}}}& \multirow{2}{*}{\begin{tabular}{c} Case B \end{tabular}}& $\mu_{\rm jISI}$ & 8.01E-02\\
+& & $\mu_T$ & 1.6\\
+\bottomrule
+\\
+\midrule
+\multirow{3}{*}{\rotatebox[origin=c]{90}{\small{\textbf{TITAN-IVA-G}}}}& \multirow{2}{*}{\begin{tabular}{c} Case B \end{tabular}}& $\mu_{\rm jISI}$ & 2.94E-01\\
+& & $\mu_T$ & 6.4\\
+\bottomrule
+\\
+\midrule
+\multirow{3}{*}{\rotatebox[origin=c]{90}{\small{\textbf{TITAN-IVA-G}}}}& \multirow{2}{*}{\begin{tabular}{c} Case B \end{tabular}}& $\mu_{\rm jISI}$ & 4.72E-01\\
+& & $\mu_T$ & 7.9\\
+\bottomrule
+\\
+\midrule
+\multirow{3}{*}{\rotatebox[origin=c]{90}{\small{\textbf{TITAN-IVA-G}}}}& \multirow{2}{*}{\begin{tabular}{c} Case B \end{tabular}}& $\mu_{\rm jISI}$ & 5.74E-01\\
+& & $\mu_T$ & 10.2\\
+\bottomrule
+\\
+\midrule
+\multirow{3}{*}{\rotatebox[origin=c]{90}{\small{\textbf{TITAN-IVA-G}}}}& \multirow{2}{*}{\begin{tabular}{c} Case B \end{tabular}}& $\mu_{\rm jISI}$ & 5.21E-01\\
+& & $\mu_T$ & 8.0\\
+\bottomrule
+\\
+\midrule
+\multirow{3}{*}{\rotatebox[origin=c]{90}{\small{\textbf{TITAN-IVA-G}}}}& \multirow{2}{*}{\begin{tabular}{c} Case B \end{tabular}}& $\mu_{\rm jISI}$ & 6.74E-01\\
+& & $\mu_T$ & 7.9\\
+\bottomrule
+\\
+\end{tabular}
+\end{table}

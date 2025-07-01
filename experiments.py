@@ -7,24 +7,10 @@ from class_exp import *
 from class_algos import *
 from algorithms.iva_g_numpy import *
 from algorithms.titan_iva_g_reg_numpy import *
-#------------------------------------------------------------------------------------------------------
+from algorithms.titan_iva_g_reg_torch import *
+import torch
 
-lambda_1 = 0.04
-lambda_2 = 0.25
-rho_bounds_1 = [0.2,0.3]
-rho_bounds_2 = [0.6,0.7]
-rhos = [rho_bounds_1,rho_bounds_2]
-lambdas = [lambda_1,lambda_2]
-# identifiability_levels = [1e-2,1e-1,1])
-# identifiability_levels_names = ['low identifiability','medium identifiability','high identifiability']
-effective_ranks = [None]
-Ks = [5,10] #,15,20,30,40,50] #,20]
-Ns = [10,20] 
-
-common_parameters_1 = [Ks,Ns]
-# common_parameters_2 = [[5,10,20],[5,10,20]]
-metaparameters_titles_multiparam = ['Case A','Case B','Case C','Case D','Case E','Case F','Case G','Case H']
-
+# Function to generate metaparameters for the multiparameter experiment
 def get_metaparameters(rhos,lambdas):
     metaparameters_multiparam = []
     for rho_bounds in rhos:
@@ -32,8 +18,25 @@ def get_metaparameters(rhos,lambdas):
             metaparameters_multiparam.append((rho_bounds,lambda_))
     return metaparameters_multiparam
          
-# ------------------------------------------------------------------------------------------------------------------------------                
-# ------------------------------------------------------------------------------------------------------------------------------------------
+#=====================================================================================================================================================
+# MAIN EXPERIMENT (MULTIPARAMETER)
+#=====================================================================================================================================================
+
+lambda_1 = 0.04
+lambda_2 = 0.25
+rho_bounds_1 = [0.2,0.3]
+rho_bounds_2 = [0.6,0.7]
+rhos = [rho_bounds_1] #,rho_bounds_2]
+lambdas = [lambda_2]#,lambda_1]
+# identifiability_levels = [1e-2,1e-1,1])
+# identifiability_levels_names = ['low identifiability','medium identifiability','high identifiability']
+
+Ks = [10] #,20] #,15,20,30,40,50] #,20]
+Ns = [10] 
+
+common_parameters_1 = [Ks,Ns]
+# common_parameters_2 = [[5,10,20],[5,10,20]]
+metaparameters_titles_multiparam = ['Case B'] #,'Case B','Case C','Case D'] #,'Case E','Case F','Case G','Case H']
 
 label_size = 60
 mpl.rcParams['xtick.labelsize'] = label_size
@@ -41,31 +44,168 @@ mpl.rcParams['ytick.labelsize'] = label_size
 plt.rcParams['text.usetex'] = True
 
 metaparameters_multiparam = get_metaparameters(rhos,lambdas)
-metaparameters_multiparam = effective_ranks
+
 
 
 
 # algo_titan = TitanIvaG((0,0.4,0),name='titan',alpha=1,gamma_w=0.99,crit_ext=1e-10,crit_int=1e-10,library='numpy')
-algo_palm_np = TitanIvaG((0,0.4,0),name='palm_np',legend='PALM-IVA-G-NP',alpha=1,gamma_w=0.99,gamma_c = 1.99,nu=0,crit_ext=1e-10,crit_int=1e-10,library='numpy')
-algo_palm_torch = TitanIvaG((0,0.8,0),name='palm_torch',legend='PALM-IVA-G-TORCH',alpha=1,gamma_w=0.99,gamma_c = 1.99,nu=0,crit_ext=1e-10,crit_int=1e-10,library='torch')
+# algo_palm = TitanIvaG((0,0.4,0),name='palm',legend='PALM-IVA-G',alpha=1,gamma_w=0.99,gamma_c = 1.99,nu=0,crit_ext=1e-10,crit_int=1e-10,library='numpy')
+# algo_palm_torch = TitanIvaG((0,0.8,0),name='palm_torch',legend='PALM-IVA-G-TORCH',alpha=1,gamma_w=0.99,gamma_c = 1.99,nu=0,crit_ext=1e-10,crit_int=1e-10,library='torch')
 # algo_iva_g_n = IvaG((0.5,0,0),name='iva_g_n',legend='IVA-G-N',crit_ext=1e-7,opt_approach='newton',library='numpy')
 # algo_iva_g_v = IvaG((0.5,1,0),name='iva_g_v',legend='IVA-G-V',crit_ext=1e-6,opt_approach='gradient',library='numpy')
 # algo_palm_boost = TitanIvaG((0,0.4,0),name='palm_boost',alpha=1,gamma_w=0.99,gamma_c = 1.99,nu=0,crit_ext=1e-10,crit_int=1e-10,library='numpy',boost=True)
 
 
-algos = [algo_palm_np,algo_palm_torch] #,algo_iva_g_v] #algo_iva_g_n,
+# algos = [algo_palm,algo_iva_g_v,algo_iva_g_n]
 
 
-exp1 = ComparisonExperimentIvaG('rank effect',algos,metaparameters_multiparam,metaparameters_titles_multiparam,
-                                common_parameters_1,'effective rank',title_fontsize=50,legend_fontsize=6,N_exp=3,charts=False,legend=False)
+# exp1 = ComparisonExperimentIvaG('rank effect',algos,metaparameters_multiparam,metaparameters_titles_multiparam,
+                                # common_parameters_1,'effective rank',title_fontsize=50,legend_fontsize=6,N_exp=3,charts=False,legend=False)
 # exp2 = ComparisonExperimentIvaG('palm part 2',algos,metaparameters_multiparam,metaparameters_titles_multiparam,
                                 # common_parameters_2,'multiparam',title_fontsize=50,legend_fontsize=6,N_exp=20,charts=False,legend=False)
-exp1.compute()
+# exp1.compute()
 # exp2.get_data_from_folder('2024-05-16_02-22')
 # exp1.make_table()
 
 # exp2.make_charts(full=True)
 
+#=====================================================================================================================================================
+# EXPERIMENT FOR AuxIVA_ISS
+#=====================================================================================================================================================
+# algo_aux_iva_iss_l = AuxIVA_ISS((0.4,0,0.8),name='aux_iva_iss_l',legend='AuxIVA-ISS-L',library='numpy',proj_back=False,model='laplace',n_iter=10000)
+# # algo_aux_iva_iss_g = AuxIVA_ISS((0.8,0,0.8),name='aux_iva_iss_g',legend='AuxIVA-ISS-G',library='numpy',proj_back=False,model='gauss')
+# algos = [algo_aux_iva_iss_l] #, algo_aux_iva_iss_g]  
+
+# exp4 = ComparisonExperimentIvaG('AuxIVA-ISS',algos,metaparameters_multiparam,metaparameters_titles_multiparam,
+#                                 common_parameters_1,'multiparam',title_fontsize=50,legend_fontsize=6,T=10000,N_exp=10,charts=False,legend=False)
+# exp4.compute()
+
+#=====================================================================================================================================================
+# EXPERIMENT FOR THE EFFECT OF EXACT C UPDATES
+#=====================================================================================================================================================
+
+# algo_palm = TitanIvaG((0,0.4,0),name='palm',legend='PALM-IVA-G',alpha=1,gamma_w=0.99,gamma_c = 1.99,nu=0,crit_ext=1e-10,crit_int=1e-10,library='numpy')
+# algo_palm_exactC = TitanIvaG((0,0.4,0),name='palm_exactC',legend='PALM-IVA-G-ExactC',alpha=1,gamma_w=0.99,gamma_c = 1.99,nu=0,crit_ext=1e-10,crit_int=1e-10,library='numpy',exactC=True)
+# algos = [algo_palm,algo_palm_exactC]
+
+# exp3 = ComparisonExperimentIvaG('experiment for exact C',algos,metaparameters_multiparam,metaparameters_titles_multiparam,
+#                                 common_parameters_1,'multiparam',title_fontsize=50,legend_fontsize=6,N_exp=40,charts=False,legend=False)
+# exp3.compute()
+
+#=====================================================================================================================================================
+# EXPERIMENT FOR THE EFFECT OF RANK (to be completed)
+#=====================================================================================================================================================
+
+
+# effective_ranks = [None]
+# metaparameters_multiparam = effective_ranks
+
+
+#=====================================================================================================================================================
+# EXPERIMENT FOR THE EFFECT OF EPSILON
+#=====================================================================================================================================================
+
+# lambda_ = 0.25
+# rho_bounds = [0.2,0.3]
+# lambdas = [lambda_]
+# rhos = [rho_bounds]
+# Ns = [10]
+# Ks = [10]
+# T = 10000
+# epsilon_exponents = [-12,-9,-6,-3,-2,-1]
+# metaparameters_multiparam = get_metaparameters(rhos,lambdas)
+# common_parameters_1 = [Ks,Ns]
+# metaparameters_titles_multiparam = ['Case A']
+
+# algo_titan_12 = TitanIvaG((0,0.2,0),name='eps = 1e-12',alpha=1,gamma_w=0.99,crit_ext=1e-10,crit_int=1e-10,library='numpy',epsilon=1e-12)
+# algo_titan_9 = TitanIvaG((0,0.4,0),name='eps = 1e-9',alpha=1,gamma_w=0.99,crit_ext=1e-10,crit_int=1e-10,library='numpy',epsilon=1e-9)
+# algo_titan_6 = TitanIvaG((0,0.6,0),name='eps = 1e-6',alpha=1,gamma_w=0.99,crit_ext=1e-10,crit_int=1e-10,library='numpy',epsilon=1e-6)
+# algo_titan_3 = TitanIvaG((0,0.8,0),name='eps = 1e-3',alpha=1,gamma_w=0.99,crit_ext=1e-10,crit_int=1e-10,library='numpy',epsilon=1e-3)
+# algo_titan_2 = TitanIvaG((0,0.9,0),name='eps = 1e-2',alpha=1,gamma_w=0.99,crit_ext=1e-10,crit_int=1e-10,library='numpy',epsilon=1e-2)
+# algo_titan_1 = TitanIvaG((0,1,0),name='eps = 1e-1',alpha=1,gamma_w=0.99,crit_ext=1e-10,crit_int=1e-10,library='numpy',epsilon=1e-1)
+
+# algos = [algo_titan_12,algo_titan_9,algo_titan_6,algo_titan_3,algo_titan_2,algo_titan_1]
+
+# exp1 = ComparisonExperimentIvaG('effect of epsilon',algos,metaparameters_multiparam,metaparameters_titles_multiparam,
+#                                 common_parameters_1,'multiparam',title_fontsize=50,legend_fontsize=6,N_exp=10,charts=False,legend=False)
+                               
+# exp1.compute()
+# exp1.make_table()
+
+#=====================================================================================================================================================
+# ROBUSTNESS TO INFLATION OF Rx
+#=====================================================================================================================================================
+
+# inflate_lambdas = [0,1e-3,1e-2,1e-1,1,10]
+
+# algo_palm_inflate_0 = TitanIvaG((0,0.2,0),name='palm_inflate_0',alpha=1,gamma_w=0.99,crit_ext=1e-10,crit_int=1e-10,library='numpy',inflate=False)
+# algo_palm_inflate_0001 = TitanIvaG((0,0.4,0),name='palm_inflate_0001',alpha=1,gamma_w=0.99,crit_ext=1e-10,crit_int=1e-10,library='numpy',inflate=True,lambda_inflate=1e-3)
+# algo_palm_inflate_001 = TitanIvaG((0,0.6,0),name='palm_inflate_001',alpha=1,gamma_w=0.99,crit_ext=1e-10,crit_int=1e-10,library='numpy',inflate=True,lambda_inflate=1e-2)
+# algo_palm_inflate_01 = TitanIvaG((0,0.7,0),name='palm_inflate_01',alpha=1,gamma_w=0.99,crit_ext=1e-10,crit_int=1e-10,library='numpy',inflate=True,lambda_inflate=1e-1)
+# algo_palm_inflate_1 = TitanIvaG((0,0.8,0),name='palm_inflate_1',alpha=1,gamma_w=0.99,crit_ext=1e-10,crit_int=1e-10,library='numpy',inflate=True,lambda_inflate=1)
+# algo_palm_inflate_10 = TitanIvaG((0,1,0),name='palm_inflate_10',alpha=1,gamma_w=0.99,crit_ext=1e-10,crit_int=1e-10,library='numpy',inflate=True,lambda_inflate=10)
+
+# algos = [algo_palm_inflate_0001,algo_palm_inflate_001,algo_palm_inflate_01,algo_palm_inflate_1,algo_palm_inflate_10]
+
+# exp1 = ComparisonExperimentIvaG('robustness to errors on Rx',algos,metaparameters_multiparam,metaparameters_titles_multiparam,
+#                                 common_parameters_1,'multiparam',title_fontsize=50,legend_fontsize=6,N_exp=100,charts=False,legend=False)
+# exp1.compute()
+# exp1.make_table()
+
+#=====================================================================================================================================================
+# ROBUSTNESS TO DOWNSAMPLING
+#=====================================================================================================================================================
+
+algo_palm_10000 = TitanIvaG((0,0.2,0),name='palm_10000',alpha=1,gamma_w=0.99,crit_ext=1e-10,crit_int=1e-10,max_iter=5000,library='numpy',down_sample=False)
+algo_palm_5000 = TitanIvaG((0,0.4,0),name='palm_5000',alpha=1,gamma_w=0.99,crit_ext=1e-10,crit_int=1e-10,max_iter=5000,library='numpy',down_sample=True,num_samples=5000)
+algo_palm_1000 = TitanIvaG((0,0.6,0),name='palm_1000',alpha=1,gamma_w=0.99,crit_ext=1e-10,crit_int=1e-10,max_iter=5000,library='numpy',down_sample=True,num_samples=1000)
+algo_palm_500 = TitanIvaG((0,0.7,0),name='palm_500',alpha=1,gamma_w=0.99,crit_ext=1e-10,crit_int=1e-10,max_iter=5000,library='numpy',down_sample=True,num_samples=500)
+algo_palm_200 = TitanIvaG((0,0.8,0),name='palm_200',alpha=1,gamma_w=0.99,crit_ext=1e-10,crit_int=1e-10,max_iter=5000,library='numpy',down_sample=True,num_samples=200)
+algo_palm_150 = TitanIvaG((0,0.8,0),name='palm_150',alpha=1,gamma_w=0.99,crit_ext=1e-10,crit_int=1e-10,max_iter=5000,library='numpy',down_sample=True,num_samples=150)
+algo_palm_120 = TitanIvaG((0,0.8,0),name='palm_120',alpha=1,gamma_w=0.99,crit_ext=1e-10,crit_int=1e-10,max_iter=5000,library='numpy',down_sample=True,num_samples=120)
+algo_palm_100 = TitanIvaG((0,0.9,0),name='palm_100',alpha=1,gamma_w=0.99,crit_ext=1e-10,crit_int=1e-10,max_iter=5000,library='numpy',down_sample=True,num_samples=100)
+algo_palm_50 = TitanIvaG((0,1,0),name='palm_50',alpha=1,gamma_w=0.99,crit_ext=1e-10,crit_int=1e-10,max_iter=5000,library='numpy',down_sample=True,num_samples=50)
+
+algos = [algo_palm_10000,algo_palm_5000,algo_palm_1000,algo_palm_500,algo_palm_200,algo_palm_150,algo_palm_120,algo_palm_100,algo_palm_50]
+
+exp1 = ComparisonExperimentIvaG('robustness to downsampling',algos,metaparameters_multiparam,metaparameters_titles_multiparam,
+                                common_parameters_1,'multiparam',title_fontsize=50,legend_fontsize=6,N_exp=100,charts=False,legend=False)
+exp1.compute()
+exp1.make_table()
+
+
+#=====================================================================================================================================================
+# ROBUSTNESS TO DOWNSAMPLING + INFLATION OF Rx
+#=====================================================================================================================================================
+
+# algo_palm_10000 = TitanIvaG((0,0.2,0),name='palm_10000',alpha=1,gamma_w=0.99,crit_ext=1e-10,crit_int=1e-10,library='numpy',down_sample=False)
+# algo_palm_5000 = TitanIvaG((0,0.4,0),name='palm_5000',alpha=1,gamma_w=0.99,crit_ext=1e-10,crit_int=1e-10,library='numpy',down_sample=True,num_samples=5000)
+# algo_palm_1000 = TitanIvaG((0,0.6,0),name='palm_1000',alpha=1,gamma_w=0.99,crit_ext=1e-10,crit_int=1e-10,library='numpy',down_sample=True,num_samples=1000)
+# algo_palm_500 = TitanIvaG((0,0.7,0),name='palm_500',alpha=1,gamma_w=0.99,crit_ext=1e-10,crit_int=1e-10,library='numpy',down_sample=True,num_samples=500)
+# algo_palm_200 = TitanIvaG((0,0.8,0),name='palm_200',alpha=1,gamma_w=0.99,crit_ext=1e-10,crit_int=1e-10,library='numpy',down_sample=True,num_samples=200)
+# algo_palm_150 = TitanIvaG((0,0.8,0),name='palm_150',alpha=1,gamma_w=0.99,crit_ext=1e-10,crit_int=1e-10,library='numpy',down_sample=True,num_samples=150)
+# algo_palm_120 = TitanIvaG((0,0.8,0),name='palm_120',alpha=1,gamma_w=0.99,crit_ext=1e-10,crit_int=1e-10,library='numpy',down_sample=True,num_samples=120)
+# algo_palm_100 = TitanIvaG((0,0.9,0),name='palm_100',alpha=1,gamma_w=0.99,crit_ext=1e-10,crit_int=1e-10,library='numpy',down_sample=True,num_samples=100)
+# algo_palm_50 = TitanIvaG((0,1,0),name='palm_50',alpha=1,gamma_w=0.99,crit_ext=1e-10,crit_int=1e-10,library='numpy',down_sample=True,num_samples=50)
+# algo_palm_10000_inflate = TitanIvaG((0,0.2,0),name='palm_10000_inflate',alpha=1,gamma_w=0.99,crit_ext=1e-10,crit_int=1e-10,library='numpy',down_sample=False,inflate=True,lambda_inflate=1)
+# algo_palm_5000_inflate = TitanIvaG((0,0.4,0),name='palm_5000_inflate',alpha=1,gamma_w=0.99,crit_ext=1e-10,crit_int=1e-10,library='numpy',down_sample=True,num_samples=5000,inflate=True,lambda_inflate=1)
+# algo_palm_1000_inflate = TitanIvaG((0,0.6,0),name='palm_1000_inflate',alpha=1,gamma_w=0.99,crit_ext=1e-10,crit_int=1e-10,library='numpy',down_sample=True,num_samples=1000,inflate=True,lambda_inflate=1)
+# algo_palm_500_inflate = TitanIvaG((0,0.7,0),name='palm_500_inflate',alpha=1,gamma_w=0.99,crit_ext=1e-10,crit_int=1e-10,library='numpy',down_sample=True,num_samples=500,inflate=True,lambda_inflate=1)
+# algo_palm_200_inflate = TitanIvaG((0,0.8,0),name='palm_200_inflate',alpha=1,gamma_w=0.99,crit_ext=1e-10,crit_int=1e-10,library='numpy',down_sample=True,num_samples=200,inflate=True,lambda_inflate=1)
+# algo_palm_150_inflate = TitanIvaG((0,0.8,0),name='palm_150_inflate',alpha=1,gamma_w=0.99,crit_ext=1e-10,crit_int=1e-10,library='numpy',down_sample=True,num_samples=150,inflate=True,lambda_inflate=1)
+# algo_palm_120_inflate = TitanIvaG((0,0.8,0),name='palm_120_inflate',alpha=1,gamma_w=0.99,crit_ext=1e-10,crit_int=1e-10,library='numpy',down_sample=True,num_samples=120,inflate=True,lambda_inflate=1)
+# algo_palm_100_inflate = TitanIvaG((0,0.9,0),name='palm_100_inflate',alpha=1,gamma_w=0.99,crit_ext=1e-10,crit_int=1e-10,library='numpy',down_sample=True,num_samples=100,inflate=True,lambda_inflate=1)
+# algo_palm_50_inflate = TitanIvaG((0,1,0),name='palm_50_inflate',alpha=1,gamma_w=0.99,crit_ext=1e-10,crit_int=1e-10,library='numpy',down_sample=True,num_samples=50,inflate=True,lambda_inflate=1)
+
+# algos = [algo_palm_10000,algo_palm_10000_inflate,algo_palm_5000,algo_palm_5000_inflate,algo_palm_1000,algo_palm_1000_inflate,algo_palm_500,algo_palm_500_inflate,algo_palm_200,algo_palm_200_inflate,algo_palm_150,algo_palm_150_inflate,algo_palm_120,algo_palm_120_inflate,algo_palm_100,algo_palm_100_inflate,algo_palm_50,algo_palm_50_inflate]
+
+# exp1 = ComparisonExperimentIvaG('robustness to downsampling + inflation',algos,metaparameters_multiparam,metaparameters_titles_multiparam,
+#                                 common_parameters_1,'multiparam',title_fontsize=50,legend_fontsize=6,N_exp=10,charts=False,legend=False)
+# exp1.compute()
+# exp1.make_table()
+
+#=====================================================================================================================================================
+# ANALYSIS OF THE SLOWEST SUBPROCESS
 #=====================================================================================================================================================
 
 # if __name__ == '__main__':
@@ -77,7 +217,12 @@ exp1.compute()
 #     stats = pstats.Stats(profiler).sort_stats('cumtime')
 #     stats.print_stats()
 
+
+
+
 #=====================================================================================================================================================
+# EXPERIMENT FOR EMPIRICAL CONVERGENCE
+#======================================================================================================================================================
 
 # N = 20
 # K = 20
@@ -107,6 +252,9 @@ exp1.compute()
 # np.array(jisi_n).tofile(output_folder+'/jisi_n',sep=',')
 
 #=====================================================================================================================================================
+# TO BE MOVE TO A SEPARATE PROJECT
+#======================================================================================================================================================
+
 
 # K = 40
 # folder_path = '../../SourceModeling/fMRI_data/'
@@ -145,3 +293,55 @@ exp1.compute()
 # print(A)
 # # for key, value in data.items():
 # #     print(f"{key}: {value.shape}, {value.dtype}")
+
+# import pandas as pd
+# import numpy as np
+
+
+#-----------------------------------------------------------
+# Chemin vers le fichier CSV
+# csv_file = 'training_validation_losses_10_10_D3.csv'
+
+# # Lire le fichier CSV avec pandas
+# df = pd.read_csv(csv_file)
+
+# # Convertir le DataFrame pandas en tableau NumPy
+# tab = df.to_numpy()
+
+# T = tab[:,0]
+# train = tab[:,1]
+# val = tab[:,2]
+
+# plt.figure(figsize=(10, 6))
+
+# # Tracer les données
+# plt.plot(T, train, label='Train', marker='o', linestyle='-', color='b')
+# plt.plot(T, val, label='Validation', marker='s', linestyle='--', color='r')
+
+# # Ajouter un titre et des légendes
+# plt.title('Loss (Train and Validation)', fontsize=24)
+# plt.xlabel('Epochs', fontsize=20)
+# plt.ylabel('Mean jISI', fontsize=20)
+# plt.yscale('log')
+# plt.legend( fontsize=18)
+
+# # Ajouter une grille pour une meilleure lisibilité
+# plt.grid(True)
+
+# # Afficher la figure
+# plt.show()
+
+#-----------------------------------------------------------
+
+
+# Charger le fichier sur le CPU
+# X,A = torch.load('X_A_0.pt', map_location=torch.device('cpu'))
+# X = X.float()
+
+# Exemple d'utilisation des tenseurs
+# Assurez-vous que toutes les variables utilisées dans les opérations sont de type Float
+# A = A.float()
+# print(A.dtype,X.dtype)
+# print(A.shape,X.shape)
+# W,_,_,times,jisi = titan_iva_g_reg_torch(X,nu=0,gamma_c=1.99,track_jisi=True,B=A)
+# print(times[-1],jisi[-1])

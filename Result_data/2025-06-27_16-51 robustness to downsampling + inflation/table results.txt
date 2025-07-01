@@ -1,0 +1,100 @@
+\begin{table}[h!]
+\caption{blablabla}
+\vspace{0.4cm}
+\fontsize{5pt}{5pt}\selectfont
+\begin{tabular}{cm{0.5cm}m{0.5cm}c}
+& & & \multicolumn{1}{c}{$K$ = 10}\\
+ \cmidrule(lr){4-4}
+& & & $N$ = 10\\
+\midrule
+\multirow{3}{*}{\rotatebox[origin=c]{90}{\small{\textbf{TITAN-IVA-G}}}}& \multirow{2}{*}{\begin{tabular}{c} Case B \end{tabular}}& $\mu_{\rm jISI}$ & \textbf{1.39E-02}\\
+& & $\mu_T$ & 1.6\\
+\bottomrule
+\\
+\midrule
+\multirow{3}{*}{\rotatebox[origin=c]{90}{\small{\textbf{TITAN-IVA-G}}}}& \multirow{2}{*}{\begin{tabular}{c} Case B \end{tabular}}& $\mu_{\rm jISI}$ & 1.41E-02\\
+& & $\mu_T$ & 1.8\\
+\bottomrule
+\\
+\midrule
+\multirow{3}{*}{\rotatebox[origin=c]{90}{\small{\textbf{TITAN-IVA-G}}}}& \multirow{2}{*}{\begin{tabular}{c} Case B \end{tabular}}& $\mu_{\rm jISI}$ & 1.96E-02\\
+& & $\mu_T$ & \textit{\textbf{1.5}}\\
+\bottomrule
+\\
+\midrule
+\multirow{3}{*}{\rotatebox[origin=c]{90}{\small{\textbf{TITAN-IVA-G}}}}& \multirow{2}{*}{\begin{tabular}{c} Case B \end{tabular}}& $\mu_{\rm jISI}$ & 1.99E-02\\
+& & $\mu_T$ & 1.7\\
+\bottomrule
+\\
+\midrule
+\multirow{3}{*}{\rotatebox[origin=c]{90}{\small{\textbf{TITAN-IVA-G}}}}& \multirow{2}{*}{\begin{tabular}{c} Case B \end{tabular}}& $\mu_{\rm jISI}$ & 4.70E-02\\
+& & $\mu_T$ & 2.0\\
+\bottomrule
+\\
+\midrule
+\multirow{3}{*}{\rotatebox[origin=c]{90}{\small{\textbf{TITAN-IVA-G}}}}& \multirow{2}{*}{\begin{tabular}{c} Case B \end{tabular}}& $\mu_{\rm jISI}$ & 4.73E-02\\
+& & $\mu_T$ & 2.2\\
+\bottomrule
+\\
+\midrule
+\multirow{3}{*}{\rotatebox[origin=c]{90}{\small{\textbf{TITAN-IVA-G}}}}& \multirow{2}{*}{\begin{tabular}{c} Case B \end{tabular}}& $\mu_{\rm jISI}$ & 7.23E-02\\
+& & $\mu_T$ & 3.9\\
+\bottomrule
+\\
+\midrule
+\multirow{3}{*}{\rotatebox[origin=c]{90}{\small{\textbf{TITAN-IVA-G}}}}& \multirow{2}{*}{\begin{tabular}{c} Case B \end{tabular}}& $\mu_{\rm jISI}$ & 7.23E-02\\
+& & $\mu_T$ & 3.9\\
+\bottomrule
+\\
+\midrule
+\multirow{3}{*}{\rotatebox[origin=c]{90}{\small{\textbf{TITAN-IVA-G}}}}& \multirow{2}{*}{\begin{tabular}{c} Case B \end{tabular}}& $\mu_{\rm jISI}$ & 2.46E-01\\
+& & $\mu_T$ & 14.6\\
+\bottomrule
+\\
+\midrule
+\multirow{3}{*}{\rotatebox[origin=c]{90}{\small{\textbf{TITAN-IVA-G}}}}& \multirow{2}{*}{\begin{tabular}{c} Case B \end{tabular}}& $\mu_{\rm jISI}$ & 2.24E-01\\
+& & $\mu_T$ & 8.0\\
+\bottomrule
+\\
+\midrule
+\multirow{3}{*}{\rotatebox[origin=c]{90}{\small{\textbf{TITAN-IVA-G}}}}& \multirow{2}{*}{\begin{tabular}{c} Case B \end{tabular}}& $\mu_{\rm jISI}$ & 4.61E-01\\
+& & $\mu_T$ & 16.0\\
+\bottomrule
+\\
+\midrule
+\multirow{3}{*}{\rotatebox[origin=c]{90}{\small{\textbf{TITAN-IVA-G}}}}& \multirow{2}{*}{\begin{tabular}{c} Case B \end{tabular}}& $\mu_{\rm jISI}$ & 3.15E-01\\
+& & $\mu_T$ & 9.7\\
+\bottomrule
+\\
+\midrule
+\multirow{3}{*}{\rotatebox[origin=c]{90}{\small{\textbf{TITAN-IVA-G}}}}& \multirow{2}{*}{\begin{tabular}{c} Case B \end{tabular}}& $\mu_{\rm jISI}$ & 5.56E-01\\
+& & $\mu_T$ & 18.2\\
+\bottomrule
+\\
+\midrule
+\multirow{3}{*}{\rotatebox[origin=c]{90}{\small{\textbf{TITAN-IVA-G}}}}& \multirow{2}{*}{\begin{tabular}{c} Case B \end{tabular}}& $\mu_{\rm jISI}$ & 3.56E-01\\
+& & $\mu_T$ & 12.5\\
+\bottomrule
+\\
+\midrule
+\multirow{3}{*}{\rotatebox[origin=c]{90}{\small{\textbf{TITAN-IVA-G}}}}& \multirow{2}{*}{\begin{tabular}{c} Case B \end{tabular}}& $\mu_{\rm jISI}$ & 5.43E-01\\
+& & $\mu_T$ & 18.6\\
+\bottomrule
+\\
+\midrule
+\multirow{3}{*}{\rotatebox[origin=c]{90}{\small{\textbf{TITAN-IVA-G}}}}& \multirow{2}{*}{\begin{tabular}{c} Case B \end{tabular}}& $\mu_{\rm jISI}$ & 4.40E-01\\
+& & $\mu_T$ & 11.9\\
+\bottomrule
+\\
+\midrule
+\multirow{3}{*}{\rotatebox[origin=c]{90}{\small{\textbf{TITAN-IVA-G}}}}& \multirow{2}{*}{\begin{tabular}{c} Case B \end{tabular}}& $\mu_{\rm jISI}$ & 6.51E-01\\
+& & $\mu_T$ & 18.4\\
+\bottomrule
+\\
+\midrule
+\multirow{3}{*}{\rotatebox[origin=c]{90}{\small{\textbf{TITAN-IVA-G}}}}& \multirow{2}{*}{\begin{tabular}{c} Case B \end{tabular}}& $\mu_{\rm jISI}$ & 5.50E-01\\
+& & $\mu_T$ & 15.8\\
+\bottomrule
+\\
+\end{tabular}
+\end{table}

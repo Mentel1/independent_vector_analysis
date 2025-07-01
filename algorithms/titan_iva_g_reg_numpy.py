@@ -121,16 +121,22 @@ def palm_iva_g_reg(X,alpha=1,gamma_c=1.99,gamma_w=0.99,max_iter=5000,
 
 def titan_iva_g_reg_numpy(X,alpha=1,gamma_c=1,gamma_w=0.99,max_iter=20000,
                          max_iter_int=100,crit_int=1e-10,crit_ext=1e-10,init_method='random',
-                         Winit=None,Cinit=None,
-                         eps=10**(-12),track_cost=False,seed=None,
-                         track_jisi=False,track_diff=False,B=None,nu=0.5,zeta=1e-3,
+                         Winit=None,Cinit=None, inflate = False, lambda_inflate=1e-3,
+                         down_sample = False,num_samples=10000,eps=10**(-12),track_cost=False
+                         ,seed=None,track_jisi=False,track_diff=False,B=None,nu=0.5,zeta=1e-3,
                          max_iter_int_C=1,adaptative_gamma_w=False,
                          gamma_w_decay=0.9,boost=False):
     N,T,K = X.shape
+    if down_sample and T > num_samples:
+        T = num_samples
+        X = X[:,:T, :]       
     alpha, gamma_c, gamma_w = to_float64(alpha, gamma_c, gamma_w)
     # if (not adaptative_gamma_w) and gamma_w > 1:
     #     raise('gamma_w must be in (0,1) if not adaptative')
     Rx = np.einsum('NTK,MTJ->KJNM',X,X)/T
+    if inflate:
+        for k in range(K):
+            Rx[k,k,:,:] += lambda_inflate*np.eye(N)
     rho_Rx = spectral_norm_extracted_numpy(Rx,K,N)
     #Empiriquement, prend des valeurs entre 1 et 3 après whitening
     W,C = initialize(N,K,init_method=init_method,Winit=Winit,Cinit=Cinit,X=X,Rx=Rx,seed=seed)
