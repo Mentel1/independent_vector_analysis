@@ -65,7 +65,7 @@ where *iva_results* is a dict containing:
 
 ## Contact
 
-In case of questions, suggestions, problems etc. please send an email to isabell.lehmann@sst.upb.de, or open an issue here on Github.
+In case of questions, suggestions, problems etc. please send an email to clement.cosserat@inria.fr, or open an issue here on Github.
 
 ## Citing
 
