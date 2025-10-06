@@ -14,3 +14,4 @@ notebooks/.ipynb_checkpoints/
 
 # Ignore the virtual environment folder created by pipenv
 /.venv/
+
