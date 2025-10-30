@@ -71,16 +71,16 @@ In case of questions, suggestions, problems etc. please send an email to clement
 If you use this package in an academic paper, please cite [3].
 
     @article{cosserat:hal-04785828,
-  TITLE = {{An Effective Iterative Solution for Independent Vector Analysis with Convergence Guarantees}},
-  AUTHOR = {Cosserat, Cl{\'e}ment and Gabrielson, Ben and Chouzenoux, Emilie and Pesquet, Jean-Christophe and Adali, T{\"u}lay},
-  URL = {https://hal.science/hal-04785828},
-  JOURNAL = {{IEEE Transactions on Signal Processing}},
-  PUBLISHER = {{Institute of Electrical and Electronics Engineers}},
-  YEAR = {2025},
-  KEYWORDS = {Proximal methods ; Blind Source Separation ; Maximum-Likelihood ; PALM Algorithm ; IVA},
-  PDF = {https://hal.science/hal-04785828v2/file/main.pdf},
-  HAL_ID = {hal-04785828},
-  HAL_VERSION = {v2}}
+     TITLE = {{An Effective Iterative Solution for Independent Vector Analysis with Convergence Guarantees}},
+     AUTHOR = {Cosserat, Cl{\'e}ment and Gabrielson, Ben and Chouzenoux, Emilie and Pesquet, Jean-Christophe and Adali, T{\"u}lay},
+     URL = {https://hal.science/hal-04785828},
+     JOURNAL = {{IEEE Transactions on Signal Processing}},
+     PUBLISHER = {{Institute of Electrical and Electronics Engineers}},
+     YEAR = {2025},
+     KEYWORDS = {Proximal methods ; Blind Source Separation ; Maximum-Likelihood ; PALM Algorithm ; IVA},
+     PDF = {https://hal.science/hal-04785828v2/file/main.pdf},
+     HAL_ID = {hal-04785828},
+     HAL_VERSION = {v2}}
     
 
 [1] M. Anderson, T. Adali, & X.-L. Li, **Joint Blind Source Separation with Multivariate Gaussian Model: Algorithms and Performance Analysis**, *IEEE Transactions on Signal Processing*, 2012, 60, 1672-1683
