@@ -70,14 +70,17 @@ In case of questions, suggestions, problems etc. please send an email to clement
 
 If you use this package in an academic paper, please cite [3].
 
-    @inproceedings{Lehmann2022,
-      title   = {Multi-task fMRI Data Fusion Using IVA and PARAFAC2},
-      author  = {Lehmann, Isabell and Acar, Evrim and Hasija, Tanuj and Akhonda, M.A.B.S. and Calhoun, Vince D. and Schreier, Peter J. and Adali, T{\"u}lay},
-      booktitle={ICASSP 2022-2022 IEEE International Conference on Acoustics, Speech and Signal Processing (ICASSP)},
-      pages={1466--1470},
-      year={2022},
-      organization={IEEE}
-      } 
+    @article{cosserat:hal-04785828,
+  TITLE = {{An Effective Iterative Solution for Independent Vector Analysis with Convergence Guarantees}},
+  AUTHOR = {Cosserat, Cl{\'e}ment and Gabrielson, Ben and Chouzenoux, Emilie and Pesquet, Jean-Christophe and Adali, T{\"u}lay},
+  URL = {https://hal.science/hal-04785828},
+  JOURNAL = {{IEEE Transactions on Signal Processing}},
+  PUBLISHER = {{Institute of Electrical and Electronics Engineers}},
+  YEAR = {2025},
+  KEYWORDS = {Proximal methods ; Blind Source Separation ; Maximum-Likelihood ; PALM Algorithm ; IVA},
+  PDF = {https://hal.science/hal-04785828v2/file/main.pdf},
+  HAL_ID = {hal-04785828},
+  HAL_VERSION = {v2}}
     
 
 [1] M. Anderson, T. Adali, & X.-L. Li, **Joint Blind Source Separation with Multivariate Gaussian Model: Algorithms and Performance Analysis**, *IEEE Transactions on Signal Processing*, 2012, 60, 1672-1683
