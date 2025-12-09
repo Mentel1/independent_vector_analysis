@@ -57,7 +57,7 @@ Ks = [5,10,20]
 Ns = [10,20,30] 
 common_parameters = [Ks,Ns]
 
-algos = create_algos_titanIVAG('gamma_w',[0.5,0.9,0.99],base_params={'nu':0,'max_iter_int_W':1})
+algos = create_algos_titanIVAG('gamma_c',[0.5,0.8,1],base_params={'gamma_w':0.99,'nu':0.5,'max_iter_int_W':1,'max_iter_int_C':1,'alpha':1,'max_iter':20000,'crit_int':1e-6,'crit_ext':1e-6,},basename='Titan')
 exp = ComparisonExperimentIvaG('CompareGammaW',metaparameters_base,metaparameters_base_titles,common_parameters,algos,N_exp=10)
 exp.compute_empirical_convergence()
 
