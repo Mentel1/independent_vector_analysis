@@ -47,7 +47,7 @@ from .helpers_iva import  _decouple_trick_numpy, _bss_isi, whiten_data_numpy, fa
 from .initializations import _jbss_sos, _cca
 
 def iva_g_numpy(X, opt_approach='newton', complex_valued=False, circular=False, whiten=True,
-          verbose=False, A=None, W_init=None, jdiag_initW=False, max_iter=1024,
+          verbose=False, A=None, W_init=None, jdiag_initW=False, max_iter=1024, down_sample = False, num_samples=10000,
           W_diff_stop=1e-6, alpha0=1.0, return_W_change=False):
     """
     Implementation of all the second-order (Gaussian) independent vector analysis (IVA) algorithms.
@@ -98,6 +98,12 @@ def iva_g_numpy(X, opt_approach='newton', complex_valued=False, circular=False, 
 
     max_iter : int, optional
         max number of iterations
+        
+    down_sample : bool, optional
+        if True, down-sample the data to num_samples samples before running IVA-G.
+        
+    num_samples : int, optional
+        number of samples to down-sample the data to, if down_sample is True.
 
     W_diff_stop : float, optional
         stopping criterion
@@ -124,7 +130,7 @@ def iva_g_numpy(X, opt_approach='newton', complex_valued=False, circular=False, 
     Sigma_N : np.ndarray
         Covariance matrix of each source component vector, with dimensions K x K x N
 
-    isi : float
+    jisi : float
         joint isi (inter-symbol-interference) for each iteration. Only available if user
         supplies true mixing matrices for computing a performance metric. Else returns np.nan.
 
@@ -165,6 +171,14 @@ def iva_g_numpy(X, opt_approach='newton', complex_valued=False, circular=False, 
 
     # get dimensions
     N, T, K = X.shape
+    if down_sample:
+        if num_samples > T:
+            raise AssertionError('num_samples must be less than or equal to T.')
+        if num_samples < 1:
+            raise AssertionError('num_samples must be greater than or equal to 1.')
+        # down-sample the data
+        X = X[:, :num_samples, :]
+        T = num_samples
 
     if A is not None:
         supply_A = True
@@ -259,7 +273,7 @@ def iva_g_numpy(X, opt_approach='newton', complex_valued=False, circular=False, 
                 W[:, :, k] = np.linalg.solve(sc.linalg.sqrtm(W[:, :, k] @ W[:, :, k].T), W[:, :, k])
 
     if supply_A:
-        isi = np.zeros(max_iter)
+        jisi = np.zeros(max_iter)
         if whiten:
             # A matrix is conditioned by V if data is whitened
             A_w = np.copy(A)
@@ -268,7 +282,7 @@ def iva_g_numpy(X, opt_approach='newton', complex_valued=False, circular=False, 
         else:
             A_w = np.copy(A)
     else:
-        isi = None
+        jisi = None
 
     # Initialize some local variables
     cost = np.zeros(max_iter)
@@ -299,7 +313,7 @@ def iva_g_numpy(X, opt_approach='newton', complex_valued=False, circular=False, 
         # Some additional computations of performance via ISI when true A is supplied
         if supply_A:
             avg_isi, joint_isi = _bss_isi(W, A_w)
-            isi[iteration] = joint_isi
+            jisi[iteration] = joint_isi
 
         W_old = np.copy(W)  # save current W as W_old
         cost[iteration] = 0
@@ -500,7 +514,7 @@ def iva_g_numpy(X, opt_approach='newton', complex_valued=False, circular=False, 
     cost = cost[0:iteration + 1]
 
     if supply_A:
-        isi = isi[0:iteration + 1]
+        jisi = jisi[0:iteration + 1]
 
     if whiten:
         for k in range(K):
@@ -524,9 +538,12 @@ def iva_g_numpy(X, opt_approach='newton', complex_valued=False, circular=False, 
         print(f"IVA-G finished after {(end - start) / 60} minutes with {iteration} iterations.")
 
     if return_W_change:
-        return W, cost, Sigma_N, isi, times, W_change
+        return W, cost, Sigma_N, jisi, times, W_change
     else:
-        return W, cost, Sigma_N, isi, times
+        return W, cost, Sigma_N, jisi, times
+
+
+
 
 def fast_iva_g_numpy(X, opt_approach='newton', complex_valued=False, circular=False, whiten=True,
           verbose=False, A=None, W_init=None, jdiag_initW=False, max_iter=1024,
@@ -598,13 +615,13 @@ def fast_iva_g_numpy(X, opt_approach='newton', complex_valued=False, circular=Fa
     Sigma_inv = np.linalg.inv(Sigma)
     
     if supply_A:
-        isi = np.zeros(max_iter)
+        jisi = np.zeros(max_iter)
         A_w = np.copy(A)
         if whiten:
             # A matrix is conditioned by V if data is whitened
             A_w = np.einsum('kNn,nmk->Nmk',V,A_w)            
     else:
-        isi = None
+        jisi = None
 
     # Initialize some local variables
     cost = np.zeros(max_iter)
@@ -624,7 +641,7 @@ def fast_iva_g_numpy(X, opt_approach='newton', complex_valued=False, circular=Fa
         # Some additional computations of performance via ISI when true A is supplied
         if supply_A:
             avg_isi, joint_isi = _bss_isi(np.transpose(W,(1,2,0), A_w))
-            isi[iteration] = joint_isi
+            jisi[iteration] = joint_isi
 
         W_old = W.copy()  # save current W as W_old
         cost[iteration] = 0
@@ -699,7 +716,7 @@ def fast_iva_g_numpy(X, opt_approach='newton', complex_valued=False, circular=Fa
     cost = cost[0:iteration + 1]
 
     if supply_A:
-        isi = isi[0:iteration + 1]
+        jisi = jisi[0:iteration + 1]
 
     if whiten:
         W = np.einsum('knN,kNM->knM',W,V)
@@ -717,7 +734,7 @@ def fast_iva_g_numpy(X, opt_approach='newton', complex_valued=False, circular=Fa
     V = np.transpose(V,(1,2,0))
     W, Sigma_N = _resort_scvs_numpy(W, R_xx, whiten, V, complex_valued, circular, None)
 
+    results = {'W': W, 'cost': np.array(cost), 'Sigma_N': Sigma_N, 'jisi': np.array(jisi),'times': np.array(times)}
     if return_W_change:
-        return W, cost, Sigma_N, isi, W_change, times
-    else:
-        return W, cost, Sigma_N, isi, times
+        results['W_change'] = np.array(W_change)
+    return results

@@ -9,8 +9,6 @@ from algorithms.titan_iva_g_reg_numpy import *
 from algorithms.titan_iva_g_reg_torch import *
 from algorithms.titan_iva_g_reg_numpy_exact_C import *
 from algorithms.AuxIVA_ISS_fakufaku.piva.auxiva_iss import auxiva_iss_py
-# from TITAN_Unrolled. 
-
 
 class IvaGAlgorithms:
 
@@ -19,48 +17,29 @@ class IvaGAlgorithms:
         self.legend = legend
         self.color = color
         self.library = library
-        self.results = None
-        self.times = None
+        self.results = {}
 
-    def set_up_for_benchmark_experiment(self,parameters_dimensions):
-        self.results = np.zeros(parameters_dimensions)
-        self.times = np.zeros(parameters_dimensions)
-
-    def solve_with_jisi(self,X,A):
-        pass
-    
-    def solve_with_cost(self,X):
+    def solve(self,X):
         pass
 
-    def solve(self,X,Winit,Cinit):
-        pass
-
-    def fill_experiment(self,X,A,coordinates,Winit=None,Cinit=None):
-        self.times[coordinates] -= time()
-        W = self.solve(X,Winit,Cinit)
-        self.times[coordinates] += time()
+    def fill_experiment(self,X,A,exp,Winit=None,Cinit=None):
+        res = self.solve(X,Winit,Cinit)
+        self.results['total_times'][exp] = res['times'][-1]
+        W = res['W']
         if self.library == 'torch':
             A = torch.tensor(A)
-            self.results[coordinates] = joint_isi_torch(W,A)
+            self.results['final_jisi'][exp] = joint_isi_torch(W,A)
         elif self.library == 'numpy':
-            self.results[coordinates] = joint_isi_numpy(W,A)
+            self.results['final_jisi'][exp] = joint_isi_numpy(W,A)
 
-    def fill_from_folder(self,foldername,meta_parameters,meta_parameters_titles,common_parameters,N_exp):
-        Ks,Ns = common_parameters
-        dimensions = len(meta_parameters),len(Ks),len(Ns),N_exp
-        self.set_up_for_benchmark_experiment(dimensions)
-        for a,metaparam in enumerate(meta_parameters):
-            metaparam_title = meta_parameters_titles[a]   
-            for ik,K in enumerate(Ks):
-                for jn,N in enumerate(Ns):
-                    filepath = foldername + '/{}/N = {} K = {}'.format(metaparam_title,N,K)
-                    if os.path.exists(filepath):
-                        self.results[a,ik,jn,:] = np.fromfile(filepath+'/results_'+self.name,sep=',')
-                        self.times[a,ik,jn,:] = np.fromfile(filepath+'/times_'+self.name,sep=',')
+    def fill_from_folder(self,output_path_individual):
+        for result in ['total_times','jisi_final']:
+            res_path = os.path.join(output_path_individual,self.name,result)
+            self.results[result] = np.fromfile(res_path,sep=',')
 
 class IvaG(IvaGAlgorithms):
 
-    def __init__(self,color='b',name='IVA-G-N',legend='IVA-G-N',opt_approach='newton',max_iter=20000,crit_ext=1e-6,library='numpy',fast=False):
+    def __init__(self,color='b',name='IVA-G-N',legend='IVA-G-N',opt_approach='newton',max_iter=5000,crit_ext=1e-6,library='numpy',fast=False,down_sample=False,num_samples=10000,Jdiag_init=False):
         super().__init__(name=name,legend=legend,color=color,library=library)
         self.alternated = False
         self.opt_approach = opt_approach
@@ -68,90 +47,46 @@ class IvaG(IvaGAlgorithms):
         self.crit_ext = crit_ext
         self.library = library
         self.fast = fast
+        self.down_sample = down_sample
+        self.num_samples = num_samples
+        self.Jdiag_init = Jdiag_init
 
-    def solve(self,X,Winit,Cinit):
-            _,_,K = X.shape
-            for k in range(K):
-                Winit[:, :, k] = np.linalg.solve(sc.linalg.sqrtm(Winit[:, :, k] @ Winit[:, :, k].T), Winit[:, :, k])
+
+    def _get_base_params(self):
+        return {'W_diff_stop': self.crit_ext,'max_iter': self.max_iter,'down_sample':self.down_sample,'num_samples':self.num_samples,'opt_approach':self.opt_approach}
+    
+    def solve(self,X,Winit=None,Cinit=None,track_jisi=False,B=None,track_costs=False,track_diffs=False,track_schemes=False,track_shifts=False,track_times=True):
+            self.normalize_Winit(X, Winit)
+            params = self._get_base_params()
+            params.update({'Winit':Winit,'A':B})
+            
             if self.library == 'numpy':
                 if self.fast:
-                    W,_,_,_,_ = fast_iva_g_numpy(X,opt_approach=self.opt_approach,W_diff_stop=self.crit_ext,
-                                max_iter=self.max_iter,W_init=Winit)
+                    return fast_iva_g_numpy(X,**params)
                 else:
-                    W,_,_,_,_ = iva_g_numpy(X,opt_approach=self.opt_approach,W_diff_stop=self.crit_ext,
-                                max_iter=self.max_iter,W_init=Winit)
+                    return iva_g_numpy(X,**params)
             elif self.library == 'torch':
                 Winit = torch.tensor(Winit)
                 X = torch.from_numpy(X)
                 if self.fast:
-                    W,_,_,_,_ = fast_iva_g_torch(X,opt_approach=self.opt_approach,W_diff_stop=self.crit_ext,
-                                max_iter=self.max_iter,W_init=Winit)
+                    return fast_iva_g_torch(X,**params)
                 else:
-                    W,_,_,_,_ = iva_g_torch(X,opt_approach=self.opt_approach,W_diff_stop=self.crit_ext,
-                                max_iter=self.max_iter,W_init=Winit)
-            return W  
+                    return iva_g_torch(X,**params)
 
-    def solve_with_jisi(self,X,A):
-        if self.library == 'numpy':
-            _,_,_,jisi,_  = iva_g_numpy(X,opt_approach=self.opt_approach,jdiag_initW=False,W_diff_stop=self.crit_ext,
-                            max_iter=self.max_iter,A=A)
-        elif self.library == 'torch':
-            A = torch.tensor(A)
-            X = torch.tensor(X)
-            _,_,_,jisi,_  = iva_g_torch(X,opt_approach=self.opt_approach,jdiag_initW=False,W_diff_stop=self.crit_ext,
-                            max_iter=self.max_iter,A=A)
-
-        return jisi
+    def normalize_Winit(self, X, Winit):
+        _,_,K = X.shape
+        for k in range(K):
+            Winit[:, :, k] = np.linalg.solve(sc.linalg.sqrtm(Winit[:, :, k] @ Winit[:, :, k].T), Winit[:, :, k]) 
     
-    def solve_with_cost(self,X):
-        if self.library == 'numpy':
-            _,cost,_,_,_ = iva_g_numpy(X,opt_approach=self.opt_approach,jdiag_initW=False,W_diff_stop=self.crit_ext,
-                            max_iter=self.max_iter)
-        elif self.library == 'torch':
-            _,cost,_,_,_ = iva_g_torch(X,opt_approach=self.opt_approach,jdiag_initW=False,W_diff_stop=self.crit_ext,
-                            max_iter=self.max_iter)
-            X = torch.tensor(X)
-        return cost
-
-'''   
-class PalmIvaG(IvaGAlgorithms):
-
-    def __init__(self,color,name='palm',alpha=1,max_iter=20000,max_iter_int=50,crit_ext=1e-9,crit_int=1e-9,
-                 gamma_w=0.99,gamma_c=1.99,seed=None):
-        super().__init__(name=name,color=color,max_iter=max_iter,crit_ext=crit_ext)
-        self.crit_int = crit_int
-        self.max_iter_int = max_iter_int
-        self.alpha = alpha
-        self.alternated = True
-        self.gamma_w = gamma_w
-        self.gamma_c = gamma_c
-        self.seed = seed
-
-    def solve(self,X,Winit,Cinit):
-        W,_,_ = palm_iva_g_reg(X,alpha=self.alpha,gamma_w=self.gamma_w,gamma_c=self.gamma_c,
-                               crit_ext=self.crit_ext,crit_int=self.crit_int,
-                               max_iter=self.max_iter,max_iter_int=self.max_iter_int,
-                               Winit=Winit,Cinit=Cinit,seed=self.seed)
-        return W  
-    
-    def solve_with_isi(self,X,A,Winit,Cinit):
-        _,_,_,isi = palm_iva_g_reg(X,alpha=self.alpha,gamma_w=self.gamma_w,gamma_c=self.gamma_c,
-                               crit_ext=self.crit_ext,crit_int=self.crit_int,
-                               max_iter=self.max_iter,max_iter_int=self.max_iter_int,
-                               Winit=Winit,Cinit=Cinit,seed=self.seed,track_isi=True,B=A)
-    
-        return isi
-'''
 
 class TitanIvaG(IvaGAlgorithms):    
 
-    def __init__(self,color,name='titan',legend='TITAN-IVA-G',nu=0.5,max_iter=20000,max_iter_int=15,max_iter_int_C=1,inflate=False,lambda_inflate=1e-3,down_sample=False,num_samples=10000,
-                 crit_ext=1e-10,crit_int=1e-10,epsilon=10^(-12),gamma_w=0.99,gamma_c=1,alpha=1,seed=None,library='numpy',boost=False,exactC=False):
+    def __init__(self,color,name='titan',legend='TITAN-IVA-G',nu=0.5,max_iter=20000,max_iter_int_W=15,max_iter_int_C=1,inflate=False,lambda_inflate=1e-3,down_sample=False,num_samples=10000,crit_ext=1e-10,crit_int=1e-10,epsilon=1e-12,gamma_w=0.99,gamma_c=1,alpha=1,seed=None,library='numpy',boost=False,exactC=False):
         super().__init__(name=name,legend=legend,color=color,library=library)
         self.crit_int = crit_int
         self.crit_ext = crit_ext
         self.max_iter = max_iter
-        self.max_iter_int = max_iter_int
+        self.max_iter_int_W = max_iter_int_W
         self.max_iter_int_C = max_iter_int_C
         self.nu = nu
         self.alpha = alpha
@@ -168,58 +103,21 @@ class TitanIvaG(IvaGAlgorithms):
         self.down_sample = down_sample
         self.num_samples = num_samples
 
-    def solve(self,X,Winit=None,Cinit=None):
+    def _get_base_params(self):
+        return {'alpha': self.alpha,'gamma_w': self.gamma_w,'gamma_c': self.gamma_c,'crit_ext': self.crit_ext,'crit_int': self.crit_int,'eps': self.epsilon,'nu': self.nu,'max_iter': self.max_iter,'max_iter_int_W': self.max_iter_int_W,'max_iter_int_C': self.max_iter_int_C,'seed': self.seed,'boost':self.boost,'inflate':self.inflate,'lambda_inflate':self.lambda_inflate,'down_sample':self.down_sample,'num_samples':self.num_samples}
+              
+    def solve(self,X,Winit=None,Cinit=None,track_jisi=False,B=None,track_costs=False,track_diffs=False,track_schemes=False,track_shifts=False,track_times=True):
+        params = self._get_base_params()
+        params.update({'Winit':Winit,'Cinit':Cinit,'track_jisi':track_jisi,'B':B,'track_costs':track_costs,'track_diffs':track_diffs,'track_schemes':track_schemes,'track_shifts':track_shifts,'track_times':track_times})    
         if self.exactC:
-            W,_,_,_ = titan_iva_g_reg_numpy_exactC(X,alpha=self.alpha,gamma_w=self.gamma_w,gamma_c=self.gamma_c,
-                                     crit_ext=self.crit_ext,crit_int=self.crit_int,eps=self.epsilon,
-                                     max_iter=self.max_iter,max_iter_int=self.max_iter_int,
-                                     max_iter_int_C=self.max_iter_int_C,nu=self.nu,
-                                     Winit=Winit,Cinit=Cinit,seed=self.seed,boost=self.boost)
+            return titan_iva_g_reg_numpy_exactC(X,**params)
         else:
             if self.library == 'numpy':
-                W,_,_,_ = titan_iva_g_reg_numpy(X,alpha=self.alpha,gamma_w=self.gamma_w,gamma_c=self.gamma_c,
-                                        crit_ext=self.crit_ext,crit_int=self.crit_int,eps=self.epsilon,
-                                        max_iter=self.max_iter,max_iter_int=self.max_iter_int,
-                                        max_iter_int_C=self.max_iter_int_C,nu=self.nu,inflate=self.inflate,down_sample=self.down_sample,num_samples=self.num_samples,
-                                        lambda_inflate=self.lambda_inflate,Winit=Winit,Cinit=Cinit,seed=self.seed,boost=self.boost)
+                return titan_iva_g_reg_numpy(X,**params)
             elif self.library == 'torch':
-                W,_,_,_ = titan_iva_g_reg_torch(X,alpha=self.alpha,gamma_w=self.gamma_w,gamma_c=self.gamma_c,
-                                        crit_ext=self.crit_ext,crit_int=self.crit_int,eps=self.epsilon,
-                                        max_iter=self.max_iter,max_iter_int=self.max_iter_int,
-                                        max_iter_int_C=self.max_iter_int_C,nu=self.nu,inflate=self.inflate,down_sample=False,num_samples=10000,
-                                        lambda_inflate=self.lambda_inflate,Winit=Winit,Cinit=Cinit,seed=self.seed)
-        return W 
+                return titan_iva_g_reg_torch(X,**params)
 
-    def solve_with_jisi(self,X,A,Winit=None,Cinit=None):
-        if self.library == 'numpy':
-            _,_,_,_,jisi = titan_iva_g_reg_numpy(X,alpha=self.alpha,gamma_w=self.gamma_w,gamma_c=self.gamma_c,
-                                     crit_ext=self.crit_ext,crit_int=self.crit_int,eps=self.epsilon,nu=self.nu,
-                                     max_iter=self.max_iter,max_iter_int=self.max_iter_int,
-                                     Winit=Winit,Cinit=Cinit,seed=self.seed,track_jisi=True,B=A)
-        elif self.library == 'torch':
-             _,_,_,_,jisi = titan_iva_g_reg_torch(X,alpha=self.alpha,gamma_w=self.gamma_w,gamma_c=self.gamma_c,
-                                     crit_ext=self.crit_ext,crit_int=self.crit_int,eps=self.epsilon,nu=self.nu,
-                                     max_iter=self.max_iter,max_iter_int=self.max_iter_int,
-                                     Winit=Winit,Cinit=Cinit,seed=self.seed,track_jisi=True,B=A)
-        
-
-        return jisi
-
-    def solve_with_cost(self,X,Winit=None,Cinit=None):
-        if self.library == 'numpy':
-            _,_,_,times,cost = titan_iva_g_reg_numpy(X,alpha=self.alpha,gamma_w=self.gamma_w,gamma_c=self.gamma_c,
-                                     crit_ext=self.crit_ext,crit_int=self.crit_int,eps=self.epsilon,nu=self.nu,
-                                     max_iter=self.max_iter,max_iter_int=self.max_iter_int,
-                                     Winit=Winit,Cinit=Cinit,seed=self.seed,track_cost=True)
-        elif self.library == 'torch':
-            _,_,_,times,cost = titan_iva_g_reg_torch(X,alpha=self.alpha,gamma_w=self.gamma_w,gamma_c=self.gamma_c,
-                                     crit_ext=self.crit_ext,crit_int=self.crit_int,eps=self.epsilon,nu=self.nu,
-                                     max_iter=self.max_iter,max_iter_int=self.max_iter_int,
-                                     Winit=Winit,Cinit=Cinit,seed=self.seed,track_cost=True)
-        
-        return times,cost   
-    
-
+ 
 class AuxIVA_ISS(IvaGAlgorithms):
 
     def __init__(self,color,name='aux_iva_iss',legend='AuxIVA-ISS',n_iter=200,library='numpy',

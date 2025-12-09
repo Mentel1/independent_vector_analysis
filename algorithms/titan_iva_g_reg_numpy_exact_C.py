@@ -119,13 +119,7 @@ def palm_iva_g_reg(X,alpha=1,gamma_c=1.99,gamma_w=0.99,max_iter=5000,
     #     print(overhead)
     return report_variables(W,C,N_step,max_iter,cost,jISI,diffs_W,diffs_C,track_diff,track_cost,track_jisi)
 
-def titan_iva_g_reg_numpy_exactC(X,alpha=1,gamma_c=1,gamma_w=0.99,max_iter=20000,
-                         max_iter_int=100,crit_int=1e-10,crit_ext=1e-10,init_method='random',
-                         Winit=None,Cinit=None,
-                         eps=10**(-12),track_cost=False,seed=None,
-                         track_jisi=False,track_diff=False,B=None,nu=0.5,zeta=1e-3,
-                         max_iter_int_C=1,adaptative_gamma_w=False,
-                         gamma_w_decay=0.9,boost=False):
+def titan_iva_g_reg_numpy_exactC(X,alpha=1,gamma_c=1,gamma_w=0.99,max_iter=20000,max_iter_int=100,crit_int=1e-10,crit_ext=1e-10,init_method='random',Winit=None,Cinit=None,eps=10**(-12),track_cost=False,seed=None,track_jisi=False,track_diff=False,B=None,nu=0.5,zeta=1e-3,max_iter_int_C=1,adaptative_gamma_w=False,gamma_w_decay=0.9,boost=False):
     N,T,K = X.shape
     alpha, gamma_c, gamma_w = to_float64(alpha, gamma_c, gamma_w)
     # if (not adaptative_gamma_w) and gamma_w > 1:

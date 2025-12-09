@@ -177,7 +177,7 @@ def palm_iva_g_reg(X,alpha=1,gamma_c=1.99,gamma_w=0.99,max_iter=5000,
 
 def titan_iva_g_reg_torch(X,alpha=1,gamma_c=1,gamma_w=0.99,max_iter=20000,
                          max_iter_int=100,crit_int=1e-10,crit_ext=1e-10,init_method='random',
-                         Winit=None,Cinit=None,
+                         Winit=None,Cinit=None, inflate=False,lambda_inflate=1e-3,
                          eps=10**(-12),track_cost=False,seed=None,
                          track_jisi=False,track_diff=False,B=None,nu=0.5,zeta = 1e-3,
                          max_iter_int_C=1,adaptative_gamma_w=False,
@@ -196,6 +196,9 @@ def titan_iva_g_reg_torch(X,alpha=1,gamma_c=1,gamma_w=0.99,max_iter=20000,
     #     raise('gamma_w must be in (0,1) if not adaptative')
     N,T,K = X.size()
     Rx = torch.einsum('NTK,MTJ->KJNM',X,X)/T
+    if inflate:
+        for k in range(K):
+            Rx[k,k,:,:] += lambda_inflate*np.eye(N)
     rho_Rx = spectral_norm_extracted_torch(Rx,K,N)
     W,C = initialize(N,K,init_method=init_method,Winit=Winit,Cinit=Cinit,X=X,Rx=Rx,seed=seed)
     l_sup = torch.max((gamma_w*alpha)/(1-gamma_w),rho_Rx*2*K*(1+torch.sqrt(2/(alpha*gamma_c))))
