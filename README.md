@@ -1,9 +1,8 @@
 # Independent Vector Analysis
    
-This package contains the Python versions of IVA-G [1] and IVA-L-SOS [2], converted from the [MLSP-Lab MATLAB Codes](http://mlsp.umbc.edu/resources.html).
+This package contains the Python code for PALM-IVA-G and for the experiments presented in (citation to come), in addition with the Python versions of IVA-G [1] and IVA-L-SOS [2], converted from the [MLSP-Lab MATLAB Codes](http://mlsp.umbc.edu/resources.html). It is originally forked from https://github.com/SSTGroup/independent_vector_analysis
 
-- **Website:** http://mlsp.umbc.edu/jointBSS_introduction.html
-- **Source-code:** https://github.com/SSTGroup/independent_vector_analysis
+- **Source-code:** https://github.com/Mentel1/independent_vector_analysis
 
 
 ## Installing independent_vector_analysis
@@ -65,20 +64,23 @@ where *iva_results* is a dict containing:
 
 ## Contact
 
-In case of questions, suggestions, problems etc. please send an email to isabell.lehmann@sst.upb.de, or open an issue here on Github.
+In case of questions, suggestions, problems etc. please send an email to clement.cosserat@inria.fr, or open an issue here on Github.
 
 ## Citing
 
 If you use this package in an academic paper, please cite [3].
 
-    @inproceedings{Lehmann2022,
-      title   = {Multi-task fMRI Data Fusion Using IVA and PARAFAC2},
-      author  = {Lehmann, Isabell and Acar, Evrim and Hasija, Tanuj and Akhonda, M.A.B.S. and Calhoun, Vince D. and Schreier, Peter J. and Adali, T{\"u}lay},
-      booktitle={ICASSP 2022-2022 IEEE International Conference on Acoustics, Speech and Signal Processing (ICASSP)},
-      pages={1466--1470},
-      year={2022},
-      organization={IEEE}
-      } 
+    @article{cosserat:hal-04785828,
+     TITLE = {{An Effective Iterative Solution for Independent Vector Analysis with Convergence Guarantees}},
+     AUTHOR = {Cosserat, Cl{\'e}ment and Gabrielson, Ben and Chouzenoux, Emilie and Pesquet, Jean-Christophe and Adali, T{\"u}lay},
+     URL = {https://hal.science/hal-04785828},
+     JOURNAL = {{IEEE Transactions on Signal Processing}},
+     PUBLISHER = {{Institute of Electrical and Electronics Engineers}},
+     YEAR = {2025},
+     KEYWORDS = {Proximal methods ; Blind Source Separation ; Maximum-Likelihood ; PALM Algorithm ; IVA},
+     PDF = {https://hal.science/hal-04785828v2/file/main.pdf},
+     HAL_ID = {hal-04785828},
+     HAL_VERSION = {v2}}
     
 
 [1] M. Anderson, T. Adali, & X.-L. Li, **Joint Blind Source Separation with Multivariate Gaussian Model: Algorithms and Performance Analysis**, *IEEE Transactions on Signal Processing*, 2012, 60, 1672-1683
