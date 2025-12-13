@@ -57,9 +57,20 @@ Ks = [5,10,20]
 Ns = [10,20,30] 
 common_parameters = [Ks,Ns]
 
-algos = create_algos_titanIVAG('gamma_c',[0.5,0.8,1],base_params={'gamma_w':0.99,'nu':0.5,'max_iter_int_W':1,'max_iter_int_C':1,'alpha':1,'max_iter':20000,'crit_int':1e-6,'crit_ext':1e-6,},basename='Titan')
-exp = ComparisonExperimentIvaG('CompareGammaW',metaparameters_base,metaparameters_base_titles,common_parameters,algos,N_exp=10)
-exp.compute_empirical_convergence()
+algos = create_algos_titanIVAG('crit',[1e-8,1e-9,1e-10,1e-11,1e-12],base_params={'alpha':1,'gamma_c':1,'nu':0.5,'max_iter_int_W':1,'max_iter_int_C':1,'gamma_w':0.99,'max_iter':20000},basename='Titan')
+exp = ComparisonExperimentIvaG('CompareDelta_Titan',metaparameters_base,metaparameters_base_titles,common_parameters,algos,N_exp=10)
+exp.save()
+exp.compute_multi_runs()
+
+algos = create_algos_titanIVAG('crit',[1e-8,1e-9,1e-10,1e-11,1e-12],base_params={'alpha':1,'gamma_c':1.99,'nu':0,'max_iter_int_W':1,'max_iter_int_C':1,'gamma_w':0.99,'max_iter':20000},basename='Palm')
+exp = ComparisonExperimentIvaG('CompareDelta_Palm',metaparameters_base,metaparameters_base_titles,common_parameters,algos,N_exp=10)
+exp.save()
+exp.compute_multi_runs()
+
+
+
+# exp.compute_empirical_convergence(res_vars=['jisi','times'])
+# exp.compute_multi_runs()
 
 
 
