@@ -1,5 +1,6 @@
 import os
 import sys
+import inspect
 import numpy as np
 from time import time
 from algorithms.iva_g_numpy import *
@@ -40,8 +41,8 @@ class IvaGAlgorithms:
         actual_cls = getattr(current_module, class_name)
         return actual_cls(**config)
 
-    def fill_experiment(self,X,A,exp,Winit=None,Cinit=None):
-        res = self.solve(X,Winit,Cinit)
+    def fill_experiment(self,X,A,exp,Winit=None,Cinit=None,number_updates=False):
+        res = self.solve(X,Winit=Winit,Cinit=Cinit,track_schemes=number_updates)
         self.results['total_times'][exp] = res['times'][-1]
         W = res['W']
         if self.library == 'torch':
@@ -49,33 +50,38 @@ class IvaGAlgorithms:
             self.results['final_jisi'][exp] = joint_isi_torch(W,A)
         elif self.library == 'numpy':
             self.results['final_jisi'][exp] = joint_isi_numpy(W,A)
+        if number_updates:
+            self.results['number_updates'][exp] = res['N_iter']
 
     def fill_from_folder(self,output_path_individual):
-        for result in ['total_times','jisi_final']:
-            res_path = os.path.join(output_path_individual,self.name,result)
+        for result in ['total_times','final_jisi']:
+            res_path = os.path.join(output_path_individual,self.name + '_' + result)
             self.results[result] = np.fromfile(res_path,sep=',')
 
 class IvaG(IvaGAlgorithms):
 
-    def __init__(self,color='b',name='IVA-G-N',legend='IVA-G-N',opt_approach='newton',max_iter=5000,crit_ext=1e-6,library='numpy',fast=False,down_sample=False,num_samples=10000,Jdiag_init=False,inflate=False,lambda_inflate=1e-3):
+    def __init__(self,color='b',name='IVA-G-N',legend='IVA-G-N',opt_approach='newton',max_iter=5000,crit_ext=1e-6,library='numpy',fast=False,down_sample=False,num_samples=10000,jdiag_initW=False,inflate=False,lambda_inflate=1e-3):
         super().__init__(name=name,legend=legend,color=color,library=library,down_sample=down_sample,num_samples=num_samples,inflate=inflate,lambda_inflate=lambda_inflate)
         self.opt_approach = opt_approach
         self.crit_ext = crit_ext
         self.fast = fast
-        self.Jdiag_init = Jdiag_init
+        self.jdiag_initW = jdiag_initW
         self.max_iter = max_iter
+        self.algo_params=['']
 
     def to_dict(self):
-        return {'class': self.__class__.__name__,'color': self.color,'name': self.name,'legend': self.legend,'library': self.library,'down_sample': self.down_sample,'num_samples': self.num_samples,'inflate': self.inflate,'lambda_inflate': self.lambda_inflate,'opt_approach': self.opt_approach,'crit_ext': self.crit_ext,'fast': self.fast,'Jdiag_init': self.Jdiag_init,'max_iter': self.max_iter}
+        return {'class': self.__class__.__name__,'color': self.color,'name': self.name,'legend': self.legend,'library': self.library,'down_sample': self.down_sample,'num_samples': self.num_samples,'inflate': self.inflate,'lambda_inflate': self.lambda_inflate,'opt_approach': self.opt_approach,'crit_ext': self.crit_ext,'fast': self.fast,'jdiag_initW': self.jdiag_initW,'max_iter': self.max_iter}
         
     def _get_base_params(self):
-        return {'W_diff_stop': self.crit_ext,'max_iter': self.max_iter,'down_sample':self.down_sample,'num_samples':self.num_samples,'inflate': self.inflate,'lambda_inflate': self.lambda_inflate,'opt_approach':self.opt_approach,'Jdiag_init': self.Jdiag_init,}
+        return {'W_diff_stop': self.crit_ext,'max_iter': self.max_iter,'down_sample':self.down_sample,'num_samples':self.num_samples,'inflate': self.inflate,'lambda_inflate': self.lambda_inflate,'opt_approach':self.opt_approach,'jdiag_initW': self.jdiag_initW}
     
-    def solve(self,X,Winit=None,Cinit=None,track_jisi=False,B=None,track_costs=False,track_diffs=False,track_schemes=False,track_shifts=False,track_times=True):
-            self.normalize_Winit(X, Winit)
+    # def solve(self,X,Winit=None,Cinit=None,track_jisi=False,A=None,track_costs=False,track_diffs=False,track_schemes=False,track_shifts=False,track_times=True):
+    def solve(self,X,**kwargs):
+            Winit = kwargs['Winit']
+            self.normalize_Winit(X,Winit)
             params = self._get_base_params()
-            params.update({'Winit':Winit,'A':B})
-            
+            used_params = list(inspect.signature(iva_g_numpy).parameters.keys())
+            params.update({k: v for k, v in kwargs.items() if k in used_params})
             if self.library == 'numpy':
                 if self.fast:
                     return fast_iva_g_numpy(X,**params)
@@ -89,7 +95,7 @@ class IvaG(IvaGAlgorithms):
                 else:
                     return iva_g_torch(X,**params)
 
-    def normalize_Winit(X, Winit):
+    def normalize_Winit(self,X,Winit):
         _,_,K = X.shape
         for k in range(K):
             Winit[:, :, k] = np.linalg.solve(sc.linalg.sqrtm(Winit[:, :, k] @ Winit[:, :, k].T), Winit[:, :, k]) 
@@ -126,16 +132,20 @@ class TitanIvaG(IvaGAlgorithms):
     def _get_base_params(self):
         return {'alpha': self.alpha,'gamma_w': self.gamma_w,'gamma_c': self.gamma_c,'crit_ext': self.crit_ext,'crit_int': self.crit_int,'epsilon': self.epsilon,'zeta':self.zeta,'nu': self.nu,'max_iter': self.max_iter,'max_iter_int_W': self.max_iter_int_W,'max_iter_int_C': self.max_iter_int_C,'seed': self.seed,'boost':self.boost,'inflate':self.inflate,'lambda_inflate':self.lambda_inflate,'down_sample':self.down_sample,'num_samples':self.num_samples}
               
-    def solve(self,X,Winit=None,Cinit=None,track_jisi=False,B=None,track_costs=False,track_diffs=False,track_schemes=False,track_shifts=False,track_times=True):
+    def solve(self,X,**kwargs):
         params = self._get_base_params()
-        params.update({'Winit':Winit,'Cinit':Cinit,'track_jisi':track_jisi,'B':B,'track_costs':track_costs,'track_diffs':track_diffs,'track_schemes':track_schemes,'track_shifts':track_shifts,'track_times':track_times})    
+        used_params = list(inspect.signature(titan_iva_g_reg_numpy).parameters.keys())
+        params.update({k: v for k, v in kwargs.items() if k in used_params})   
         if self.exactC:
-            return titan_iva_g_reg_numpy_exactC(X,**params)
+            res = titan_iva_g_reg_numpy_exactC(X,**params)
         else:
             if self.library == 'numpy':
-                return titan_iva_g_reg_numpy(X,**params)
+                res = titan_iva_g_reg_numpy(X,**params)
             elif self.library == 'torch':
-                return titan_iva_g_reg_torch(X,**params)
+                res = titan_iva_g_reg_torch(X,**params)
+        if kwargs.get('track_schemes',False):
+            res['N_iter'] = np.sum(res['scheme'][:,0])
+        return res
 
  
 class AuxIVA_ISS(IvaGAlgorithms):

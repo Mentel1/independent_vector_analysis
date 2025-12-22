@@ -48,7 +48,7 @@ def grad_H_C_reg(W,C,Rx,alpha):
     return grad
 
 def compute_L_W(C,Rx,nu,l_inf,boost):
-    N,K = C.shape[0],C.shape[2]
+    K,N = C.shape[0],C.shape[2]
     if boost:
         Hess = np.einsum('KJn,KJNM->nKNJM',C,Rx)
         Hess = np.reshape(Hess,(N,N*K,N*K))
@@ -197,7 +197,7 @@ def titan_iva_g_reg_numpy(X,alpha=1,gamma_c=1,gamma_w=0.99,max_iter=20000,max_it
 
 def record_tracked_vars(alpha, track_times, track_costs, track_jisi, track_diffs, track_schemes, B, Rx, W, C, diffs, jISI, costs, scheme, times, t0, W_old, C_old, N_step_int_W, N_step_int_C):
     if track_schemes:
-        scheme.append((N_step_int_W,N_step_int_C))
+        scheme.append([N_step_int_W,N_step_int_C])
     diff_W = diff_criteria_numpy(W,W_old)
     diff_C = diff_criteria_numpy(C,C_old)
     diff_ext = max(diff_W,diff_C)
@@ -339,7 +339,7 @@ def initialize(N,K,init_method,Winit=None,Cinit=None,X=None,Rx=None,seed=None):
         W = make_A(K,N,seed=seed)      
     return W,C
 
-def Jdiag_init(X,N,K,Rx):
+def Jdiag_init(X,K,Rx):
     if K > 2:
         # initialize with multi-set diagonalization (orthogonal solution)
         W = _jbss_sos(X, 0, 'whole')

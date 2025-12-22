@@ -119,93 +119,107 @@ class ComparisonExperimentIvaG:
         self.algos = new_algos
 
 
-    # A corriger
-    # def best_perf(self,criterion='results'):
-    #     Ks,Ns = self.common_parameters
-    #     best_perfs = np.zeros((len(self.meta_parameters),len(Ks),len(Ns)))
-    #     for a,meta_param in enumerate(self.meta_parameters):
-    #             for ik,K in enumerate(Ks):
-    #                 for jn,N in enumerate(Ns):
-                        
-    #                     if criterion == 'results':
-    #                         perfs = [np.mean(algo.results[a,ik,jn,:]) for algo in self.algos]
-    #                     else:
-    #                         perfs = [np.mean(algo.times[a,ik,jn,:]) for algo in self.algos]
-    #                     best_perfs[a,ik,jn] = min(perfs)
-    #     return best_perfs
+    def compute_features(self,algo,Ks,Ns):
+        algo.results['full_results_jisi'] = np.zeros((len(self.meta_parameters),len(Ks),len(Ns),self.N_exp))
+        algo.results['full_results_times'] = np.zeros((len(self.meta_parameters),len(Ks),len(Ns),self.N_exp))
+        for a,metaparam in enumerate(self.meta_parameters_titles):
+            for jn,N in enumerate(Ns):
+                for ik,K in enumerate(Ks):
+                    path = self.output_folder+f'/{metaparam}/N_{N}_K_{K}'
+                    algo.fill_from_folder(path)
+                    algo.results['full_results_jisi'][a,ik,jn,:] = algo.results['final_jisi']
+                    algo.results['full_results_times'][a,ik,jn,:] = algo.results['total_times']   
+        algo.results['mean_jisi'] = np.mean(algo.results['full_results_jisi'],axis=-1)
+        algo.results['mean_times'] = np.mean(algo.results['full_results_times'],axis=-1)
+        print(algo.results['mean_jisi'])
+        if self.std:
+            algo.results['std_jisi'] = np.std(algo.results['full_results_jisi'],axis=-1)
+            algo.results['std_times'] = np.std(algo.results['full_results_times'],axis=-1)
+        if self.median:
+            algo.results['median_jisi'] = np.median(algo.results['full_results_jisi'],axis=-1)
+            algo.results['median_dev_jisi'] = np.median(abs(algo.results['full_results_jisi'] - algo.results['median_jisi']),axis=-1)
+            algo.results['median_times'] = np.median(algo.results['full_results_times'],axis=-1)
+            algo.results['median_dev_times'] = np.median(abs(algo.results['full_results_times'] - algo.results['median_jisi']),axis=-1)
+    
+    def list_features(self):
+        res = ['mean_jisi','mean_times']
+        if self.std:
+            res += ['std_jisi','std_times']
+        if self.median:
+            res += ['median_jisi','median_dev_jisi','median_times','median_dev_times']
+        return res
+        
+
+    def best_perf(self,feature):
+        all_perfs = np.array([algo.results[feature] for algo in self.algos])
+        return np.min(all_perfs, axis=0)
    
-   # A corriger
-    # def make_table(self,tols=(1e-4,1e-2)): 
-    #     Ks,Ns = self.common_parameters
-    #     n_cols = len(Ks)*len(Ns)
-    #     best_results = self.best_perf(criterion='results')
-    #     best_times = self.best_perf(criterion = 'times')
-    #     tol_res,tol_time = tols
-    #     # We consider that results_algo come from the same experiment
-    #     filename = 'table results.txt' #+ algo.name + '.txt'
-    #     output_path = os.path.join(self.output_folder, filename)
-    #     if os.path.exists(output_path):
-    #         os.remove(output_path)
-    #     with open(output_path, 'a') as file:
-    #         file.write('\\begin{table}[h!]\n\\caption{'+'blablabla'+'}\n\\vspace{0.4cm}\n')
-    #         file.write('\\fontsize{{{}pt}}{{{}pt}}\selectfont\n'.format(self.table_fontsize,self.table_fontsize))
-    #         file.write('\\begin{{tabular}}{{{}}}\n'.format('cm{0.5cm}m{0.5cm}'+n_cols*'c'))
-    #         file.write('& &')
-    #         for K in Ks:
-    #             file.write(' & \\multicolumn{{{}}}{{c}}{{$K$ = {}}}'.format(len(Ns),K))
-    #         file.write('\\\\\n')
-    #         for ik,K in enumerate(Ks):
-    #             file.write(' \\cmidrule(lr){{{}-{}}}'.format(4+ik*len(Ns),3+(ik+1)*len(Ns)))
-    #         file.write('\n')
-    #         file.write('& &')
-    #         for K in Ks:
-    #             for N in Ns:
-    #                 file.write(' & $N$ = {}'.format(N))
-    #         file.write('\\\\\n')
-    #         for algo_index,algo in enumerate(self.algos):
-    #             file.write('\\midrule\n')
-    #             file.write('\\multirow{{{}}}{{*}}{{\\rotatebox[origin=c]{{90}}{{\\small{{\\textbf{{{}}}}}}}}}'.format(3*len(self.meta_parameters),algo.legend))
-    #             for a,metaparam in enumerate(self.meta_parameters):
-    #                 file.write('& \\multirow{{{}}}{{*}}{{\\begin{{tabular}}{{c}} {} \\end{{tabular}}}}& $\\mu_{{\\rm jISI}}$'.format(2+self.std+2*self.median,self.meta_parameters_titles[a]))
-    #                 for ik,K in enumerate(Ks):
-    #                     for jn,N in enumerate(Ns):
-    #                         if np.mean(algo.results[a,ik,jn,:]) <= best_results[a,ik,jn] + tol_res:
-    #                             file.write(' & \\textbf{{{:.2E}}}'.format(np.mean(algo.results[a,ik,jn,:])))
-    #                         else:
-    #                             file.write(' & {:.2E}'.format(np.mean(algo.results[a,ik,jn,:])))
-    #                 file.write('\\\\\n')
-    #                 if self.median:
-    #                     file.write('& & $\\widehat{\\mu}_{\\rm jISI}$')
-    #                     for ik,K in enumerate(Ks):
-    #                         for jn,N in enumerate(Ns):
-    #                             file.write(' & {:.2E}'.format(np.median(algo.results[a,ik,jn,:])))
-    #                     file.write('\\\\\n')
-    #                 if self.std:
-    #                     file.write('& & $\\sigma_{\\rm jISI}$')
-    #                     for ik,K in enumerate(Ks):
-    #                         for jn,N in enumerate(Ns):
-    #                             file.write(' & {:.2E}'.format(np.std(algo.results[a,ik,jn,:])))
-    #                     file.write('\\\\\n')
-    #                 if self.median:
-    #                     file.write('& & $\\widehat{\\sigma}_{\\rm jISI}$')
-    #                     for ik,K in enumerate(Ks):
-    #                         for jn,N in enumerate(Ns):
-    #                             file.write(' & {:.2E}'.format(np.median(np.abs(algo.results[a,ik,jn,:]-np.mean(algo.results[a,ik,jn,:])))))
-    #                     file.write('\\\\\n')
-    #                 file.write('& & $\\mu_T$')
-    #                 for ik,K in enumerate(Ks):
-    #                     for jn,N in enumerate(Ns):
-    #                         if np.mean(algo.times[a,ik,jn,:]) <= best_times[a,ik,jn] + tol_time:
-    #                             file.write(' & \\textit{{\\textbf{{{:.1f}}}}}'.format(np.mean(algo.times[a,ik,jn,:])))
-    #                         else:
-    #                             file.write(' & {:.1f}'.format(np.mean(algo.times[a,ik,jn,:])))
-    #                 file.write('\\\\\n')
-    #                 if a == len(self.meta_parameters)-1:
-    #                     file.write('\\bottomrule\n')
-    #                     file.write('\\\\\n')
-    #                 else:
-    #                     file.write('\\cmidrule(lr){{2-{}}}'.format(3+n_cols))
-    #         file.write('\\end{tabular}\n\\end{table}')
+    base_feature_names = {'mean_jisi':'$\\mu_{\\rm jISI}$','mean_times':'$\mu_\\texttt{T}$','median_jisi':'$\\widehat{\\mu}_{\\rm jISI}$','std_jisi':'$\\sigma_{\\rm jISI}$','median_dev_jisi':'$\\widehat{\\sigma}_{\\rm jISI}$',}
+    base_tols = {'mean_jisi':1e-4,'mean_times':1e-2}
+    
+    def make_table(self,tols=base_tols,feature_names=base_feature_names,filename='table_results.txt'):
+        Ks,Ns = self.common_parameters
+        for algo in self.algos:
+            self.compute_features(algo,Ks,Ns)  
+        features = self.list_features()
+        n_cols = len(Ks)*len(Ns)
+        bold_numbers = {}
+        for feature in ['mean_jisi','mean_times']:
+            best_feature = self.best_perf(feature)
+            for algo in self.algos:
+                bold_numbers[(feature,algo)] = algo.results[feature] <= best_feature + tols[feature]
+        # We consider that results_algo come from the same experiment 
+        output_path = os.path.join(self.output_folder, filename)
+        if os.path.exists(output_path):
+            os.remove(output_path)
+        with open(output_path, 'a') as file:
+            file.write('\\begin{table}[h!]\n\\caption{'+'blablabla'+'}\n\\vspace{0.4cm}\n')
+            file.write(f'\\fontsize{{{self.table_fontsize}pt}}{{{self.table_fontsize}pt}}\selectfont\n')
+            file.write('\\begin{tabular}{cm{0.5cm}m{0.5cm}'+n_cols*'c'+'}\n')
+            file.write('& &')
+            for K in Ks:
+                file.write(f' & \\multicolumn{{{len(Ns)}}}{{c}}{{$K$ = {K}}}')
+            file.write('\\\\\n')
+            for ik,K in enumerate(Ks):
+                file.write(f' \\cmidrule(lr){{{4+ik*len(Ns)}-{3+(ik+1)*len(Ns)}}}')
+            file.write('\n')
+            file.write('& &')
+            for K in Ks:
+                for N in Ns:
+                    file.write(f' & $N$ = {N}')
+            file.write('\\\\\n')
+            for algo in self.algos:
+                self.write_algo_in_table(file,algo,Ks,Ns,n_cols,features,feature_names,bold_numbers)
+            file.write('\\end{tabular}\n\\end{table}')
+
+    def write_algo_in_table(self,file,algo,Ks,Ns,n_cols,features,feature_names,bold_numbers):
+        file.write('\\midrule\n')
+        file.write(f'\\multirow{{{3*len(self.meta_parameters)}}}{{*}}{{\\rotatebox[origin=c]{{90}}{{\\small{{\\textbf{{{algo.legend}}}}}}}}}')
+        for a,metaparam_title in enumerate(self.meta_parameters_titles):
+            file.write(f'& \\multirow{{{2+self.std+2*self.median}}}{{*}}{{\\begin{{tabular}}{{c}} {metaparam_title} \\end{{tabular}}}}')
+            for idx,feature in enumerate(features):
+                if idx > 0:
+                    file.write('& ')
+                file.write('& ' + feature_names[feature])
+                for ik,_ in enumerate(Ks):
+                    for jn,_ in enumerate(Ns):
+                        value = algo.results[feature][a,ik,jn]
+                        if feature in ['mean_jisi','mean_times']:
+                            self.write_in_table(file,value,bold_numbers[(feature,algo)][a,ik,jn])
+                        else:
+                            self.write_in_table(file,value)
+                file.write('\\\\\n')
+            if a == len(self.meta_parameters)-1:
+                file.write('\\bottomrule\n')
+                file.write('\\\\\n')
+            else:
+                file.write(f'\\cmidrule(lr){{2-{3+n_cols}}}')
+
+    def write_in_table(self,file,value,bold=False):
+        if bold:
+            file.write(f' & \\textbf{{{value:.2E}}}')
+        else:
+            file.write(f' & {value:.2E}')
 
 
 # A corriger 
@@ -269,11 +283,13 @@ class ComparisonExperimentIvaG:
                 res_path = os.path.join(output_path_individual,algo.name + '_' + result)
                 algo.results[result].tofile(res_path,sep=',')      
                    
-    def compute_multi_runs(self):
+    def compute_multi_runs(self,number_updates=False):
         Ks,Ns = self.common_parameters
         for algo in self.algos:
             algo.results['total_times'] = np.zeros(self.N_exp)
             algo.results['final_jisi'] = np.zeros(self.N_exp)
+            if (number_updates):
+                algo.results['number_updates'] = np.zeros(self.N_exp)
         for a,metaparam in enumerate(self.meta_parameters):
             for ik,K in enumerate(Ks):
                 for jn,N in enumerate(Ns):
@@ -283,8 +299,10 @@ class ComparisonExperimentIvaG:
                         self.create_setup_multi_runs(metaparam, K, N) 
                     for exp in range(self.N_exp):
                         for algo in self.algos:
-                            algo.fill_experiment(self.setup['Datasets'][exp,:,:,:],self.setup['Mixings'][exp,:,:,:],exp,self.setup['Winits'][exp,:,:,:],self.setup['Cinits'][exp,:,:,:])
+                            algo.fill_experiment(self.setup['Datasets'][exp,:,:,:],self.setup['Mixings'][exp,:,:,:],exp,self.setup['Winits'][exp,:,:,:],self.setup['Cinits'][exp,:,:,:],number_updates=number_updates)
                             print(a,' K =',K,' N =',N,algo.name,' : ',algo.results['final_jisi'][exp],algo.results['total_times'][exp])
+                            if number_updates:
+                                print('Number of updates : ', algo.results['number_updates'][exp]) 
                     self.store_in_folder(N,K,a)
 
     def create_setup_multi_runs(self,metaparam,K,N):

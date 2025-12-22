@@ -35,6 +35,18 @@ def create_algos_titanIVAG(varying_param, values, color_bounds=[(0.2,1,0.2),(0.2
         algos.append(TitanIvaG(**params))
     return algos
 
+def create_algos_IVAG(varying_param, values, color_bounds=[(0.2,1,0.2),(0.2,0.2,1)],base_params={},basename=''):
+    algos = []
+    nval = len(values)
+    for i, value in enumerate(values):
+        params = base_params.copy()
+        params[varying_param] = value
+        t = i / (nval - 1)
+        params['color'] = tuple((1 - t) * c0 + t * c1 for c0, c1 in zip(color_bounds[0], color_bounds[1]))
+        params['name'] = basename + '_' + varying_param + '=' + str(value)      
+        algos.append(IvaG(**params))
+    return algos
+
 
 #================================================================================================
 # MAIN EXPERIMENT (MULTIPARAMETER)
@@ -45,9 +57,9 @@ lambda_2 = 0.25
 rho_bounds_1 = [0.2,0.3]
 rho_bounds_2 = [0.6,0.7]
 rhos = [rho_bounds_1,rho_bounds_2]
-lambdas = [lambda_2,lambda_1]
+lambdas = [lambda_1,lambda_2]
 metaparameters_multiparam = get_metaparameters(rhos,lambdas)
-metaparameters_titles_multiparam = ['Case A','Case B','Case C','Case D']
+metaparameters_titles_multiparam = ['Case_A','Case_B','Case_C','Case_D']
 metaparameters_base = get_metaparameters([[0.4,0.6]],[0.1])
 metaparameters_base_titles = ['Base_case']
 # metaparameters_identifiability = [1e-2,1e-1,1]
@@ -57,15 +69,24 @@ Ks = [5,10,20]
 Ns = [10,20,30] 
 common_parameters = [Ks,Ns]
 
-algos = create_algos_titanIVAG('crit',[1e-8,1e-9,1e-10,1e-11,1e-12],base_params={'alpha':1,'gamma_c':1,'nu':0.5,'max_iter_int_W':1,'max_iter_int_C':1,'gamma_w':0.99,'max_iter':20000},basename='Titan')
-exp = ComparisonExperimentIvaG('CompareDelta_Titan',metaparameters_base,metaparameters_base_titles,common_parameters,algos,N_exp=10)
-exp.save()
-exp.compute_multi_runs()
+# algos_v = create_algos_IVAG('crit_ext',[1e-5,1e-6],color_bounds=[(0.2,0,0),(1,0,0)],base_params={'opt_approach':'gradient','max_iter':4},basename='iva_g_v') #,1e-7,1e-8,1e-9,1e-10]
+# algos_n = create_algos_IVAG('crit_ext',[1e-5,1e-6,1e-7,1e-8,1e-9,1e-10],color_bounds=[(0,0,0.2),(0,0,1)],base_params={'opt_approach':'newton','max_iter':20000},basename='iva_g_n')
 
-algos = create_algos_titanIVAG('crit',[1e-8,1e-9,1e-10,1e-11,1e-12],base_params={'alpha':1,'gamma_c':1.99,'nu':0,'max_iter_int_W':1,'max_iter_int_C':1,'gamma_w':0.99,'max_iter':20000},basename='Palm')
-exp = ComparisonExperimentIvaG('CompareDelta_Palm',metaparameters_base,metaparameters_base_titles,common_parameters,algos,N_exp=10)
+# exp_v = ComparisonExperimentIvaG('CompareDelta_IVAG',metaparameters_base,metaparameters_base_titles,common_parameters,algos_v,N_exp=1)
+# exp_v.compute_multi_runs(number_updates=True)
+# exp_v.make_table()
+
+# exp_n = ComparisonExperimentIvaG('CompareDelta_IVAG',metaparameters_base,metaparameters_base_titles,common_parameters,algos_n,N_exp=10)
+# exp_n.compute_multi_runs()
+
+algo_1 = TitanIvaG((0,0,0),name='palm',nu=0,gamma_c=1.99)
+algo_2 = IvaG((0,0,0),name='IVA_G_V',legend='IVA-G-V',opt_approach='gradient',crit_ext=1e-6)
+algo_3 = IvaG((0,0,0),name='IVA_G_N',legend='IVA-G-N',opt_approach='newton',crit_ext=1e-6)
+algos = [algo_1,algo_2,algo_3]
+exp = ComparisonExperimentIvaG('ExternalRace_multiparam',metaparameters_multiparam,metaparameters_titles_multiparam,common_parameters,algos,N_exp=100)
 exp.save()
-exp.compute_multi_runs()
+exp.compute_multi_runs(number_updates=True)
+
 
 
 
@@ -100,25 +121,6 @@ exp.compute_multi_runs()
 
 # exp2.make_charts(full=True)
 
-
-#================================================================================================
-# EXPERIMENT FOR THE STEPSIZES
-#================================================================================================
-
-
-# algo_titan_50_1 = TitanIvaG((0,0.4,0.4),name='titan_50_1',alpha=1,gamma_w=0.5,gamma_c=1,crit_ext=0,crit_int=0,library='numpy',max_iter=2000,max_iter_int=1,max_iter_int_C=1,legend='$\gamma_W = 0.5, \gamma_C = 1$')
-# algo_titan_50_19 = TitanIvaG((0,0.4,0.7),name='titan_50_19',alpha=1,gamma_w=0.5,gamma_c=1.9,crit_ext=0,crit_int=0,library='numpy',max_iter=2000,max_iter_int=1,max_iter_int_C=1,legend='$\gamma_W = 0.5, \gamma_C = 1.9$')
-# algo_titan_50_199 = TitanIvaG((0,0.4,1),name='titan_50_199',alpha=1,gamma_w=0.5,gamma_c=1.99,crit_ext=0,crit_int=0,library='numpy',max_iter=2000,max_iter_int=1,max_iter_int_C=1,legend='$\gamma_W = 0.5, \gamma_C = 1.99$')
-# algo_titan_90_1 = TitanIvaG((0,0.7,0.4),name='titan_90_1',alpha=1,gamma_w=0.9,gamma_c=1,crit_ext=0,crit_int=0,library='numpy',max_iter=2000,max_iter_int=1,max_iter_int_C=1,legend='$\gamma_W = 0.9, \gamma_C = 1$')
-# algo_titan_90_19 = TitanIvaG((0,0.7,0.7),name='titan_90_19',alpha=1,gamma_w=0.9,gamma_c=1.9,crit_ext=0,crit_int=0,library='numpy',max_iter=2000,max_iter_int=1,max_iter_int_C=1,legend='$\gamma_W = 0.9, \gamma_C = 1.9$')
-# algo_titan_90_199 = TitanIvaG((0,0.7,1),name='titan_90_199',alpha=1,gamma_w=0.9,gamma_c=1.99,crit_ext=0,crit_int=0,library='numpy',max_iter=2000,max_iter_int=1,max_iter_int_C=1,legend='$\gamma_W = 0.9, \gamma_C = 1.99$')
-# algo_titan_99_1 = TitanIvaG((0,1,0.4),name='titan_99_1',alpha=1,gamma_w=0.99,gamma_c=1,crit_ext=0,crit_int=0,library='numpy',max_iter=2000,max_iter_int=1,max_iter_int_C=1,legend='$\gamma_W = 0.99, \gamma_C = 1$')
-# algo_titan_99_19 = TitanIvaG((0,1,0.7),name='titan_99_19',alpha=1,gamma_w=0.99,gamma_c=1.9,crit_ext=0,crit_int=0,library='numpy',max_iter=2000,max_iter_int=1,max_iter_int_C=1,legend='$\gamma_W = 0.99, \gamma_C = 1.9$')
-# algo_titan_99_199 = TitanIvaG((0,1,1),name='titan_99_199',alpha=1,gamma_w=0.99,gamma_c=1.99,crit_ext=0,crit_int=0,library='numpy',max_iter=2000,max_iter_int=1,max_iter_int_C=1,legend='$\gamma_W = 0.99, \gamma_C = 1.99$')
-
-# algos = [algo_titan_50_1,algo_titan_50_19,algo_titan_50_199,algo_titan_90_1,algo_titan_90_19,algo_titan_90_199,algo_titan_99_1,algo_titan_99_19,algo_titan_99_199]
-# exp2 = ComparisonExperimentIvaG('stepsize experiment',algos,metaparameters_multiparam,metaparameters_titles_multiparam,common_parameters_1,'multiparam',title_fontsize=20,legend_fontsize=6,T=10000,N_exp=10,charts=False,legend=False)
-# exp2.compute_empirical_convergence()
 
 
 #================================================================================================
@@ -426,17 +428,3 @@ exp.compute_multi_runs()
 # # Afficher la figure
 # plt.show()
 
-#-----------------------------------------------------------
-
-
-# Charger le fichier sur le CPU
-# X,A = torch.load('X_A_0.pt', map_location=torch.device('cpu'))
-# X = X.float()
-
-# Exemple d'utilisation des tenseurs
-# Assurez-vous que toutes les variables utilisées dans les opérations sont de type Float
-# A = A.float()
-# print(A.dtype,X.dtype)
-# print(A.shape,X.shape)
-# W,_,_,times,jisi = titan_iva_g_reg_torch(X,nu=0,gamma_c=1.99,track_jisi=True,B=A)
-# print(times[-1],jisi[-1])
