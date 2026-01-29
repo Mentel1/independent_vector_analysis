@@ -79,14 +79,24 @@ common_parameters = [Ks,Ns]
 # exp_n = ComparisonExperimentIvaG('CompareDelta_IVAG',metaparameters_base,metaparameters_base_titles,common_parameters,algos_n,N_exp=10)
 # exp_n.compute_multi_runs()
 
-algo_1 = TitanIvaG((0,0,0),name='palm',nu=0,gamma_c=1.99)
-algo_2 = IvaG((0,0,0),name='IVA_G_V',legend='IVA-G-V',opt_approach='gradient',crit_ext=1e-6)
-algo_3 = IvaG((0,0,0),name='IVA_G_N',legend='IVA-G-N',opt_approach='newton',crit_ext=1e-6)
-algos = [algo_1,algo_2,algo_3]
-exp = ComparisonExperimentIvaG('ExternalRace_multiparam',metaparameters_multiparam,metaparameters_titles_multiparam,common_parameters,algos,N_exp=100)
-exp.save()
-exp.compute_multi_runs(number_updates=True)
 
+            
+            
+
+
+
+
+# algo_1 = TitanIvaG((0,0,0),name='palm',nu=0,gamma_c=1.99)
+# algo_2 = IvaG((0,0,0),name='IVA_G_V',legend='IVA-G-V',opt_approach='gradient',crit_ext=1e-6)
+# algo_3 = IvaG((0,0,0),name='IVA_G_N',legend='IVA-G-N',opt_approach='newton',crit_ext=1e-6)
+# algos = [algo_1,algo_2,algo_3]
+# exp = ComparisonExperimentIvaG('ExternalRace_multiparam',metaparameters_multiparam,metaparameters_titles_multiparam,common_parameters,algos,N_exp=100)
+# exp.save()
+# exp.compute_multi_runs(number_updates=True)
+
+exp = ComparisonExperimentIvaG.from_folder('2025-12-29_16-46_ExternalRace_multiparam')
+exp.make_table()
+#exp.compute_multi_runs(number_updates=True)
 
 
 
@@ -428,3 +438,43 @@ exp.compute_multi_runs(number_updates=True)
 # # Afficher la figure
 # plt.show()
 
+
+#================================================================================================
+# REDUCTION OF THE DATA IN THE EXPERIMENTS
+#================================================================================================
+
+
+# def reduce_data_in_folder(T = 10000):
+#     root ='Result_data'
+#     for expname in os.listdir(root):
+#         if 'setup' in os.listdir(os.path.join(root,expname)):
+#             print(f'let us reduce the data in {expname}')
+#             path = os.path.join('Result_data',expname,'setup')
+#             for case in os.listdir(path):
+#                 for dim in os.listdir(os.path.join(path,case)):
+#                     parts = dim.split('_')
+#                     if len(parts)==1:
+#                       parts = dim.split(' ')
+#                       N = int(parts[2])
+#                       K = int(parts[5])
+#                     else:
+#                       N = int(parts[1])  # 10 
+#                       K = int(parts[3])
+#                     folderpath = os.path.join(path,case,dim)
+#                     if 'Datasets' in os.listdir(folderpath):
+#                         filepath = os.path.join(folderpath,'Datasets')
+#                         dataset = np.fromfile(filepath,sep=',')
+#                         print(dataset.shape)
+#                         if dataset.shape[0]%(K*N*T) == 0:
+#                             dataset.shape = (-1, N, T, K)
+#                             print(dataset.shape)
+#                             Nexp = dataset.shape[0]
+#                             dataset_cov = np.zeros((Nexp,K,K,N,N))
+#                             for exp in range(Nexp):
+#                                 X = dataset[exp,:,:,:]
+#                                 dataset_cov[exp,:,:,:,:] = np.einsum('NTK,MTJ->KJNM',X,X)/T
+#                             newfilepath = os.path.join(folderpath,'Datasets_cov')
+#                             dataset_cov.tofile(newfilepath)
+#                         os.remove(filepath)
+                        
+#                         print('done for N = {N}, K = {K}, and case = {case}')

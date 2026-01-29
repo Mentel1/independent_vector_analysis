@@ -10,7 +10,7 @@ import scipy.io
 
 from class_algos import *
    
-def generate_whitened_problem(T,K,N,mode='multiparam',metaparam=None):
+def generate_whitened_problem(T,K,N,mode='multiparam',metaparam=None,down_sample=False,num_samples=10000,inflate=False,lambda_inflate=1e-3):
     epsilon=1
     rho_bounds=[0.4,0.6]
     lambda_=0.5
@@ -34,7 +34,14 @@ def generate_whitened_problem(T,K,N,mode='multiparam',metaparam=None):
     X = make_X(S,A)
     X_,U = whiten_data_numpy(X)
     A_ = np.einsum('nNk,Nvk->nvk',U,A)
-    return X_,A_
+    if down_sample and T > num_samples:
+        T = num_samples
+        X_ = X_[:,:T,:]       
+    Rx_ = np.einsum('NTK,MTJ->KJNM',X_,X_)/T
+    if inflate:
+        for k in range(K):
+            Rx_[k,k,:,:] += lambda_inflate*np.eye(N)
+    return Rx_,A_
 
 class ComparisonExperimentIvaG:
 #On classe les résultats et les graphes dans une arborescence de 2 niveaux : un premier niveau de meta-paramètres qui dépendent du mode d'expérience (donc un sous-dossier par combinaison de MP) puis un second niveau de paramètres commun (en l'occurrence K et N), c'est la que sont les graphes de comparaison.
@@ -42,7 +49,7 @@ class ComparisonExperimentIvaG:
 
 # L'idée de cette classe est de créer un objet "expérience" qui est déterminé par son nom (lié au mode de l'expérience, mais pas que, à voir au cas par cas), par la date à laquelle elle est lancée, et qui contient/fabrique les résultats sous forme de données dans les algos qu'elle implique ou dans des dossiers qui peuvent ou pas contenir des graphes. On veut pouvoir recréer un objet expérience à partir d'un dossier pour retravailler les données calculées et les présenter différemment par exemple
       
-    def __init__(self,name,meta_parameters,meta_parameters_titles,common_parameters,algos,mode='multiparam',date=None,T=10000,N_exp=100,table_fontsize=5,median=False,std=False,legend=True,legend_fontsize=5,title_fontsize=10):  
+    def __init__(self,name,meta_parameters,meta_parameters_titles,common_parameters,algos,mode='multiparam',date=None,T=10000,N_exp=100,table_fontsize=8,median=False,std=False,updates=False,legend=True,legend_fontsize=5,title_fontsize=10):  
         self.algos = algos
         self.N_exp = N_exp
         self.mode = mode
@@ -62,6 +69,7 @@ class ComparisonExperimentIvaG:
         self.table_fontsize = table_fontsize
         self.median = median
         self.std = std
+        self.updates = updates
         self.legend = legend
         self.title_fontsize = title_fontsize
         self.legend_fontsize = legend_fontsize 
@@ -89,13 +97,13 @@ class ComparisonExperimentIvaG:
     
     @classmethod
     def from_folder(cls,folderpath):
-        filepath = folderpath + '/config.json'
+        filepath = 'Result_data/' + folderpath + '/config.json'
         with open(filepath, 'r') as f:
             config = json.load(f)
         algos = []
         algo_names = config.pop('algo_names')
         for algo_name in algo_names:
-            algopath = folderpath + '/algos/' + algo_name
+            algopath = 'Result_data/' + folderpath + '/algos/' + algo_name
             with open(algopath, 'r') as f:
                 algo_config = json.load(f)
             algo = IvaGAlgorithms.from_dict(algo_config)
@@ -122,27 +130,44 @@ class ComparisonExperimentIvaG:
     def compute_features(self,algo,Ks,Ns):
         algo.results['full_results_jisi'] = np.zeros((len(self.meta_parameters),len(Ks),len(Ns),self.N_exp))
         algo.results['full_results_times'] = np.zeros((len(self.meta_parameters),len(Ks),len(Ns),self.N_exp))
+        if self.updates:
+            algo.results['full_results_updates'] = np.zeros((len(self.meta_parameters),len(Ks),len(Ns),self.N_exp))
         for a,metaparam in enumerate(self.meta_parameters_titles):
             for jn,N in enumerate(Ns):
                 for ik,K in enumerate(Ks):
                     path = self.output_folder+f'/{metaparam}/N_{N}_K_{K}'
                     algo.fill_from_folder(path)
                     algo.results['full_results_jisi'][a,ik,jn,:] = algo.results['final_jisi']
-                    algo.results['full_results_times'][a,ik,jn,:] = algo.results['total_times']   
+                    algo.results['full_results_times'][a,ik,jn,:] = algo.results['total_times']
+                    if self.updates:
+                        algo.results['full_results_updates'][a,ik,jn,:] = algo.results['number_updates']
         algo.results['mean_jisi'] = np.mean(algo.results['full_results_jisi'],axis=-1)
         algo.results['mean_times'] = np.mean(algo.results['full_results_times'],axis=-1)
+        if self.updates:
+            algo.results['mean_updates'] = np.mean(algo.results['full_results_updates'],axis=-1)
         print(algo.results['mean_jisi'])
         if self.std:
             algo.results['std_jisi'] = np.std(algo.results['full_results_jisi'],axis=-1)
             algo.results['std_times'] = np.std(algo.results['full_results_times'],axis=-1)
+            if self.updates:
+                algo.results['std_updates'] = np.std(algo.results['full_results_updates'],axis=-1)
         if self.median:
             algo.results['median_jisi'] = np.median(algo.results['full_results_jisi'],axis=-1)
             algo.results['median_dev_jisi'] = np.median(abs(algo.results['full_results_jisi'] - algo.results['median_jisi']),axis=-1)
             algo.results['median_times'] = np.median(algo.results['full_results_times'],axis=-1)
-            algo.results['median_dev_times'] = np.median(abs(algo.results['full_results_times'] - algo.results['median_jisi']),axis=-1)
+            algo.results['median_dev_times'] = np.median(abs(algo.results['full_results_times'] - algo.results['median_times']),axis=-1)
+            if self.updates:
+                algo.results['median_updates'] = np.median(algo.results['full_results_updates'],axis=-1)
+                algo.results['median_updates'] = np.median(abs(algo.results['full_results_updates'] - algo.results['median_updates']),axis=-1)
     
     def list_features(self):
         res = ['mean_jisi','mean_times']
+        if self.updates:
+            res += ['mean_updates']
+            if self.std:
+                res += ['std_updates']
+            if self.median:
+                res += ['median_updates','median_dev_updates']
         if self.std:
             res += ['std_jisi','std_times']
         if self.median:
@@ -154,7 +179,7 @@ class ComparisonExperimentIvaG:
         all_perfs = np.array([algo.results[feature] for algo in self.algos])
         return np.min(all_perfs, axis=0)
    
-    base_feature_names = {'mean_jisi':'$\\mu_{\\rm jISI}$','mean_times':'$\mu_\\texttt{T}$','median_jisi':'$\\widehat{\\mu}_{\\rm jISI}$','std_jisi':'$\\sigma_{\\rm jISI}$','median_dev_jisi':'$\\widehat{\\sigma}_{\\rm jISI}$',}
+    base_feature_names = {'mean_jisi':'$\\mu_{\\rm jISI}$','mean_times':'$\mu_\\texttt{T}$','mean_updates':'$\mu_\\texttt{N}$','median_jisi':'$\\widehat{\\mu}_{\\rm jISI}$','std_jisi':'$\\sigma_{\\rm jISI}$','median_dev_jisi':'$\\widehat{\\sigma}_{\\rm jISI}$',}
     base_tols = {'mean_jisi':1e-4,'mean_times':1e-2}
     
     def make_table(self,tols=base_tols,feature_names=base_feature_names,filename='table_results.txt'):
@@ -175,7 +200,7 @@ class ComparisonExperimentIvaG:
         with open(output_path, 'a') as file:
             file.write('\\begin{table}[h!]\n\\caption{'+'blablabla'+'}\n\\vspace{0.4cm}\n')
             file.write(f'\\fontsize{{{self.table_fontsize}pt}}{{{self.table_fontsize}pt}}\selectfont\n')
-            file.write('\\begin{tabular}{cm{0.5cm}m{0.5cm}'+n_cols*'c'+'}\n')
+            file.write('\\begin{tabular}{cm{1cm}m{0.5cm}'+n_cols*'c'+'}\n')
             file.write('& &')
             for K in Ks:
                 file.write(f' & \\multicolumn{{{len(Ns)}}}{{c}}{{$K$ = {K}}}')
@@ -194,9 +219,9 @@ class ComparisonExperimentIvaG:
 
     def write_algo_in_table(self,file,algo,Ks,Ns,n_cols,features,feature_names,bold_numbers):
         file.write('\\midrule\n')
-        file.write(f'\\multirow{{{3*len(self.meta_parameters)}}}{{*}}{{\\rotatebox[origin=c]{{90}}{{\\small{{\\textbf{{{algo.legend}}}}}}}}}')
+        file.write(f'\\multirow{{{3*len(self.meta_parameters)}}}{{*}}{{\\raisebox{{-2\\height}}{{\\rotatebox[origin=c]{{90}}{{\\makebox[0pt][c]{{\\Large{{\\textbf{{{algo.legend}}}}}}}}}}}}}')
         for a,metaparam_title in enumerate(self.meta_parameters_titles):
-            file.write(f'& \\multirow{{{2+self.std+2*self.median}}}{{*}}{{\\begin{{tabular}}{{c}} {metaparam_title} \\end{{tabular}}}}')
+            file.write(f'& \\multirow{{{len(features)}}}{{*}}{{\\begin{{tabular}}{{c}} {metaparam_title} \\end{{tabular}}}}')
             for idx,feature in enumerate(features):
                 if idx > 0:
                     file.write('& ')
@@ -204,10 +229,13 @@ class ComparisonExperimentIvaG:
                 for ik,_ in enumerate(Ks):
                     for jn,_ in enumerate(Ns):
                         value = algo.results[feature][a,ik,jn]
+                        bold = False
+                        exp_notation = True
                         if feature in ['mean_jisi','mean_times']:
-                            self.write_in_table(file,value,bold_numbers[(feature,algo)][a,ik,jn])
-                        else:
-                            self.write_in_table(file,value)
+                            bold = bold_numbers[(feature,algo)][a,ik,jn]
+                        if feature in ['mean_updates','mean_times']:
+                            exp_notation = False
+                        self.write_in_table(file,value,bold,exp_notation)
                 file.write('\\\\\n')
             if a == len(self.meta_parameters)-1:
                 file.write('\\bottomrule\n')
@@ -215,11 +243,12 @@ class ComparisonExperimentIvaG:
             else:
                 file.write(f'\\cmidrule(lr){{2-{3+n_cols}}}')
 
-    def write_in_table(self,file,value,bold=False):
+    def write_in_table(self,file,value,bold=False,exp_notation=True):
+        fmt = '.2E' if exp_notation else '.1f'
         if bold:
-            file.write(f' & \\textbf{{{value:.2E}}}')
+            file.write(f' & \\textbf{{{value:{fmt}}}}')
         else:
-            file.write(f' & {value:.2E}')
+            file.write(f' & {value:{fmt}}')
 
 
 # A corriger 
@@ -283,36 +312,39 @@ class ComparisonExperimentIvaG:
                 res_path = os.path.join(output_path_individual,algo.name + '_' + result)
                 algo.results[result].tofile(res_path,sep=',')      
                    
-    def compute_multi_runs(self,number_updates=False):
+    def compute_multi_runs(self):
         Ks,Ns = self.common_parameters
         for algo in self.algos:
             algo.results['total_times'] = np.zeros(self.N_exp)
             algo.results['final_jisi'] = np.zeros(self.N_exp)
-            if (number_updates):
+            if (self.updates):
                 algo.results['number_updates'] = np.zeros(self.N_exp)
         for a,metaparam in enumerate(self.meta_parameters):
             for ik,K in enumerate(Ks):
                 for jn,N in enumerate(Ns):
-                    if self.exists_setup:
-                        self.get_setup_from_folder(N,K,a)
-                    else:
-                        self.create_setup_multi_runs(metaparam, K, N) 
-                    for exp in range(self.N_exp):
-                        for algo in self.algos:
-                            algo.fill_experiment(self.setup['Datasets'][exp,:,:,:],self.setup['Mixings'][exp,:,:,:],exp,self.setup['Winits'][exp,:,:,:],self.setup['Cinits'][exp,:,:,:],number_updates=number_updates)
-                            print(a,' K =',K,' N =',N,algo.name,' : ',algo.results['final_jisi'][exp],algo.results['total_times'][exp])
-                            if number_updates:
-                                print('Number of updates : ', algo.results['number_updates'][exp]) 
-                    self.store_in_folder(N,K,a)
+                    output_path_individual = f'{self.output_folder}/{self.meta_parameters_titles[a]}/N_{N}_K_{K}'
+                    if not os.path.exists(output_path_individual) or len(os.listdir(output_path_individual))==0:
+                    # if self.exists_setup:
+                    #     self.get_setup_from_folder(N,K,a)
+                    # else:
+                    #     self.create_setup_multi_runs(metaparam, K, N)
+                        self.create_setup_multi_runs(metaparam,K,N) 
+                        for exp in range(self.N_exp):
+                            for algo in self.algos:
+                                algo.fill_experiment(self.setup['Datasets_cov'][exp,:,:,:,:],self.setup['Mixings'][exp,:,:,:],exp,self.setup['Winits'][exp,:,:,:],self.setup['Cinits'][exp,:,:,:],number_updates=self.updates)
+                                print(a,' K =',K,' N =',N,algo.name,' : ',algo.results['final_jisi'][exp],algo.results['total_times'][exp])
+                                if self.updates:
+                                    print('Number of updates : ', algo.results['number_updates'][exp]) 
+                        self.store_in_folder(N,K,a)
 
     def create_setup_multi_runs(self,metaparam,K,N):
-        self.setup['Datasets'] = np.zeros((self.N_exp,N,self.T,K))
+        self.setup['Datasets_cov'] = np.zeros((self.N_exp,K,K,N,N))
         self.setup['Mixings'] = np.zeros((self.N_exp,N,N,K))
         self.setup['Winits'] = np.zeros((self.N_exp,N,N,K))
         self.setup['Cinits'] = np.zeros((self.N_exp,K,K,N))
         for exp in range(self.N_exp):
-            X,A = generate_whitened_problem(self.T,K,N,mode=self.mode,metaparam=metaparam)
-            self.setup['Datasets'][exp,:,:,:] = X
+            Rx,A = generate_whitened_problem(self.T,K,N,mode=self.mode,metaparam=metaparam)
+            self.setup['Datasets_cov'][exp,:,:,:,:] = Rx
             self.setup['Mixings'][exp,:,:,:] = A
             self.setup['Winits'][exp,:,:,:] = make_A(K,N)
             self.setup['Cinits'][exp,:,:,:] = make_Sigma(K,N,rank=K+10)
@@ -332,13 +364,13 @@ class ComparisonExperimentIvaG:
                     else:
                         self.create_setup_empirical_convergence(metaparam,K,N)
                     for algo in self.algos:
-                        res = algo.solve(self.setup['Dataset'],self.setup['Winit'],self.setup['Cinit'],B=self.setup['Mixing'],**track_params)
+                        res = algo.solve(self.setup['Datasets_cov'],self.setup['Winit'],self.setup['Cinit'],B=self.setup['Mixing'],**track_params)
                         for res_var in res_vars:
                             algo.results[res_var] = res[res_var]
                     self.store_in_folder(N,K,a)
        
     def create_setup_empirical_convergence(self,metaparam,K,N):
-        self.setup['Dataset'],self.setup['Mixing'] = generate_whitened_problem(self.T,K,N,mode=self.mode,metaparam=metaparam)
+        self.setup['Datasets_cov'],self.setup['Mixing'] = generate_whitened_problem(self.T,K,N,mode=self.mode,metaparam=metaparam,down_sample=False,num_samples=10000,inflate=False,lambda_inflate=1e-3)
         self.setup['Winit'] = make_A(K,N)
         self.setup['Cinit'] = make_Sigma(K,N,rank=K+10)
         
