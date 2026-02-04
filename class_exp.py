@@ -10,51 +10,18 @@ import scipy.io
 
 from class_algos import *
    
-def generate_whitened_problem(T,K,N,mode='multiparam',metaparam=None,down_sample=False,num_samples=10000,inflate=False,lambda_inflate=1e-3):
-    epsilon=1
-    rho_bounds=[0.4,0.6]
-    lambda_=0.5
-    rank=None
-    if metaparam == None:
-        raise ValueError('metaparam must be specified')
-    if mode == 'identifiability':
-        epsilon = metaparam
-    elif mode == 'multiparam':
-        rho_bounds,lambda_ = metaparam
-    elif mode == 'effective rank':
-        rank = metaparam
-    else:
-        raise ValueError(f'Unknown mode {mode}')
-    A = make_A(K,N)
-    # A = full_to_blocks(A,idx_W,K)
-    if rank == None:
-        rank = K+10
-    Sigma = make_Sigma(K,N,rank=rank,epsilon=epsilon,rho_bounds=rho_bounds,lambda_=lambda_,seed=None,normalize=False)
-    S = make_S(Sigma,T)
-    X = make_X(S,A)
-    X_,U = whiten_data_numpy(X)
-    A_ = np.einsum('nNk,Nvk->nvk',U,A)
-    if down_sample and T > num_samples:
-        T = num_samples
-        X_ = X_[:,:T,:]       
-    Rx_ = np.einsum('NTK,MTJ->KJNM',X_,X_)/T
-    if inflate:
-        for k in range(K):
-            Rx_[k,k,:,:] += lambda_inflate*np.eye(N)
-    return Rx_,A_
-
 class ComparisonExperimentIvaG:
-#On classe les résultats et les graphes dans une arborescence de 2 niveaux : un premier niveau de meta-paramètres qui dépendent du mode d'expérience (donc un sous-dossier par combinaison de MP) puis un second niveau de paramètres commun (en l'occurrence K et N), c'est la que sont les graphes de comparaison.
+#On classe les résultats et les graphes dans une arborescence de 2 niveaux : un premier niveau de data-paramètres qui dépendent du mode d'expérience (donc un sous-dossier par combinaison de MP) puis un second niveau de paramètres commun (en l'occurrence K et N), c'est la que sont les graphes de comparaison.
 #Si on veut faire varier d'autres paramètres au niveau des algos, on définit plusieurs algorithmes séparés ! 
 
 # L'idée de cette classe est de créer un objet "expérience" qui est déterminé par son nom (lié au mode de l'expérience, mais pas que, à voir au cas par cas), par la date à laquelle elle est lancée, et qui contient/fabrique les résultats sous forme de données dans les algos qu'elle implique ou dans des dossiers qui peuvent ou pas contenir des graphes. On veut pouvoir recréer un objet expérience à partir d'un dossier pour retravailler les données calculées et les présenter différemment par exemple
       
-    def __init__(self,name,meta_parameters,meta_parameters_titles,common_parameters,algos,mode='multiparam',date=None,T=10000,N_exp=100,table_fontsize=8,median=False,std=False,updates=False,legend=True,legend_fontsize=5,title_fontsize=10):  
+    def __init__(self,name,data_parameters,data_parameters_titles,common_parameters,algos,mode='multiparam',date=None,T=10000,N_exp=100,table_fontsize=8,median=False,std=False,updates=False,legend=True,legend_fontsize=10,title_fontsize=10):  
         self.algos = algos
         self.N_exp = N_exp
         self.mode = mode
-        self.meta_parameters = meta_parameters
-        self.meta_parameters_titles = meta_parameters_titles
+        self.data_parameters = data_parameters
+        self.data_parameters_titles = data_parameters_titles
         self.common_parameters = common_parameters
         self.name = name
         if date:
@@ -78,7 +45,7 @@ class ComparisonExperimentIvaG:
     
     def to_dict(self):
         algo_names = [algo.name for algo in self.algos]
-        return {'N_exp':self.N_exp,'name':self.name,'common_parameters':self.common_parameters,'meta_parameters':self.meta_parameters,'meta_parameters_titles':self.meta_parameters_titles,'mode':self.mode,'T':self.T,'date':self.date,'table_fontsize':self.table_fontsize,'median':self.median,'std':self.std,'legend':self.legend,'title_fontsize':self.title_fontsize,'legend_fontsize':self.legend_fontsize,'algo_names':algo_names}
+        return {'N_exp':self.N_exp,'name':self.name,'common_parameters':self.common_parameters,'data_parameters':self.data_parameters,'data_parameters_titles':self.data_parameters_titles,'mode':self.mode,'T':self.T,'date':self.date,'table_fontsize':self.table_fontsize,'median':self.median,'std':self.std,'legend':self.legend,'title_fontsize':self.title_fontsize,'legend_fontsize':self.legend_fontsize,'algo_names':algo_names}
         
         
     def save(self):
@@ -112,30 +79,29 @@ class ComparisonExperimentIvaG:
         return ComparisonExperimentIvaG(**config)
     
     
-    def get_results_from_folder(self,N,K,a):    
-        output_path_individual = f'{self.output_folder}/{self.meta_parameters_titles[a]}/N_{N}_K_{K}'
+    def get_results_from_folder(self,param_path):    
+        output_path_results = f'/results/{param_path}'
         for algo in self.algos:
-            algo.fill_from_folder(output_path_individual)
+            algo.fill_from_folder(output_path_results)
     
-    def get_setup_from_folder(self,N,K,a):
-        output_path_setup = f'/setup/{self.meta_parameters_titles[a]}/N_{N}_K_{K}'
+    def get_data_from_folder(self,param_path):
+        output_path_data = f'/data/{param_path}'
         for setup_var in self.setup.keys():
-            var_path = os.path.join(output_path_setup,setup_var)
+            var_path = os.path.join(output_path_data,setup_var)
             self.setup[setup_var].fromfile(var_path,sep=',')
             
     def set_algos(self,new_algos):
         self.algos = new_algos
 
-
     def compute_features(self,algo,Ks,Ns):
-        algo.results['full_results_jisi'] = np.zeros((len(self.meta_parameters),len(Ks),len(Ns),self.N_exp))
-        algo.results['full_results_times'] = np.zeros((len(self.meta_parameters),len(Ks),len(Ns),self.N_exp))
+        algo.results['full_results_jisi'] = np.zeros((len(self.data_parameters),len(Ks),len(Ns),self.N_exp))
+        algo.results['full_results_times'] = np.zeros((len(self.data_parameters),len(Ks),len(Ns),self.N_exp))
         if self.updates:
-            algo.results['full_results_updates'] = np.zeros((len(self.meta_parameters),len(Ks),len(Ns),self.N_exp))
-        for a,metaparam in enumerate(self.meta_parameters_titles):
+            algo.results['full_results_updates'] = np.zeros((len(self.data_parameters),len(Ks),len(Ns),self.N_exp))
+        for a,dataparam in enumerate(self.data_parameters_titles):
             for jn,N in enumerate(Ns):
                 for ik,K in enumerate(Ks):
-                    path = self.output_folder+f'/{metaparam}/N_{N}_K_{K}'
+                    path = self.output_folder+f'/{dataparam}/N_{N}_K_{K}'
                     algo.fill_from_folder(path)
                     algo.results['full_results_jisi'][a,ik,jn,:] = algo.results['final_jisi']
                     algo.results['full_results_times'][a,ik,jn,:] = algo.results['total_times']
@@ -174,7 +140,6 @@ class ComparisonExperimentIvaG:
             res += ['median_jisi','median_dev_jisi','median_times','median_dev_times']
         return res
         
-
     def best_perf(self,feature):
         all_perfs = np.array([algo.results[feature] for algo in self.algos])
         return np.min(all_perfs, axis=0)
@@ -219,9 +184,9 @@ class ComparisonExperimentIvaG:
 
     def write_algo_in_table(self,file,algo,Ks,Ns,n_cols,features,feature_names,bold_numbers):
         file.write('\\midrule\n')
-        file.write(f'\\multirow{{{3*len(self.meta_parameters)}}}{{*}}{{\\raisebox{{-2\\height}}{{\\rotatebox[origin=c]{{90}}{{\\makebox[0pt][c]{{\\Large{{\\textbf{{{algo.legend}}}}}}}}}}}}}')
-        for a,metaparam_title in enumerate(self.meta_parameters_titles):
-            file.write(f'& \\multirow{{{len(features)}}}{{*}}{{\\begin{{tabular}}{{c}} {metaparam_title} \\end{{tabular}}}}')
+        file.write(f'\\multirow{{{3*len(self.data_parameters)}}}{{*}}{{\\raisebox{{-2\\height}}{{\\rotatebox[origin=c]{{90}}{{\\makebox[0pt][c]{{\\Large{{\\textbf{{{algo.legend}}}}}}}}}}}}}')
+        for a,dataparam_title in enumerate(self.data_parameters_titles):
+            file.write(f'& \\multirow{{{len(features)}}}{{*}}{{\\begin{{tabular}}{{c}} {dataparam_title} \\end{{tabular}}}}')
             for idx,feature in enumerate(features):
                 if idx > 0:
                     file.write('& ')
@@ -237,7 +202,7 @@ class ComparisonExperimentIvaG:
                             exp_notation = False
                         self.write_in_table(file,value,bold,exp_notation)
                 file.write('\\\\\n')
-            if a == len(self.meta_parameters)-1:
+            if a == len(self.data_parameters)-1:
                 file.write('\\bottomrule\n')
                 file.write('\\\\\n')
             else:
@@ -249,15 +214,133 @@ class ComparisonExperimentIvaG:
             file.write(f' & \\textbf{{{value:{fmt}}}}')
         else:
             file.write(f' & {value:{fmt}}')
+                                          
+    def store_in_folder(self,param_path,subfolder='data'):
+            full_path = f'{self.output_folder}/{subfolder}/{param_path}'
+            os.makedirs(full_path,exist_ok=True)
+            if subfolder == 'data':
+                for setup_var in self.setup.keys():
+                    var_path = os.path.join(full_path,setup_var)
+                    self.setup[setup_var].tofile(var_path,sep=',')
+            else:     
+                for algo in self.algos:
+                    for res_var in algo.results.keys():
+                        res_path = os.path.join(full_path,algo.name + '_' + res_var)
+                        algo.results[res_var].tofile(res_path,sep=',')      
+                   
+    def compute_multi_runs(self):
+        Ks,Ns = self.common_parameters
+        for algo in self.algos:
+            algo.results['total_times'] = np.zeros(self.N_exp)
+            algo.results['final_jisi'] = np.zeros(self.N_exp)
+            if (self.updates):
+                algo.results['number_updates'] = np.zeros(self.N_exp)      
+        for a,dataparam in enumerate(self.data_parameters):
+            for ik,K in enumerate(Ks):
+                for jn,N in enumerate(Ns):
+                    print(dataparam)
+                    noise_levels,num_samples = dataparam.get('noise_levels',[0]),dataparam.get('num_samples',[self.T])
+                    param_path = f'{self.data_parameters_titles[a]}/N_{N}_K_{K}'
+                    if self.exists_setup:
+                        self.get_data_from_folder(param_path)
+                    else:
+                        self.create_data(dataparam,K,N)  
+                    for p,num_sample in enumerate(num_samples):
+                        for q,noise_level in enumerate(noise_levels):
+                            if len(num_samples)*len(noise_levels) > 1:
+                                param_path_extended = f'{param_path}/num_sample={num_sample}_noise_level={noise_level}'
+                            if not os.path.exists(f'self.output_folder/res/{param_path_extended}') or len(os.listdir(f'self.output_folder/res/{param_path}'))==0:
+                                for exp in range(self.N_exp):
+                                    for algo in self.algos:
+                                        algo.fill_experiment(self.setup['Rxs'][exp,p,q,:,:,:,:],self.setup['As'][exp,p,:,:,:],exp,self.setup['Winits'][exp,:,:,:],self.setup['Cinits'][exp,:,:,:],count_updates=self.updates)
+                                        print(f'a = {a}, K = {K}, N = {N}, {num_sample} samples and noise = {noise_level} with algo {algo.name} :',algo.results['final_jisi'][exp],algo.results['total_times'][exp])
+                                        if self.updates:
+                                            print(f'Number of updates:', algo.results['number_updates'][exp]) 
+                                self.store_in_folder(param_path_extended,'res')
+                                
+
+    def create_data(self,dataparam,K,N):
+        epsilon,rho_bounds,lambda_,rank,noise_levels,num_samples = dataparam.get('epsilon',1),dataparam.get('rho_bounds',[0.4,0.6]),dataparam.get('lambda',0.1),dataparam.get('rank',K+10),dataparam.get('noise_levels',[0]),dataparam.get('num_samples',[self.T])
+        self.setup['Rxs'] = np.zeros((self.N_exp,len(num_samples),len(noise_levels),K,K,N,N))
+        self.setup['As'] = np.zeros((self.N_exp,len(num_samples),N,N,K))
+        self.setup['Winits'] = np.zeros((self.N_exp,N,N,K))
+        self.setup['Cinits'] = np.zeros((self.N_exp,K,K,N))
+        for exp in range(self.N_exp):
+            A = make_A(K,N)
+            Sigma = make_Sigma(K,N,rank=rank,epsilon=epsilon,rho_bounds=rho_bounds,lambda_=lambda_,seed=None,normalize=False)
+            S = make_S(Sigma,self.T)
+            X = make_X(S,A)
+            for p,num_sample in enumerate(num_samples):
+                X_alt = X[:,:num_sample,:]
+                X_,U = whiten_data_numpy(X_alt)
+                A_ = np.einsum('nNk,Nvk->nvk',U,A)    
+                Rx_ = np.einsum('NTK,MTJ->KJNM',X_,X_)/num_sample
+                for q,noise_level in enumerate(noise_levels):
+                    for k in range(K):
+                        Rx_[k,k,:,:] += noise_level*np.eye(N)
+                    self.setup['Rxs'][exp,p,q,:,:,:,:] = Rx_
+                    self.setup['As'][exp,p,:,:,:] = A_
+            self.setup['Winits'][exp,:,:,:] = make_A(K,N)
+            self.setup['Cinits'][exp,:,:,:] = make_Sigma(K,N,rank=K+10)
+            
+            
+    def compute_empirical_convergence(self,a,K,N,res_vars=['jisi','costs','times'],detailed=True,exp=0):
+        track_params = {}
+        for var in res_vars:
+            track_params['track_' + var] = var in res_vars
+            if detailed and not 'detailed' in var:
+                res_vars.append('detailed_' + var)
+        if 'diffs' in res_vars:
+            res_vars += ['diffs_W','diffs_C']
+        if self.exists_setup:
+            self.get_setup_from_folder(a,K,N)
+        else:
+            self.create_setup(self.data_parameters[a],K,N)
+        for algo in self.algos:
+            res = algo.solve(self.setup['Datasets_cov'][exp,:,:,:,:],Winit=self.setup['Winits'][exp,:,:,:],Cinit=self.setup['Cinits'][exp,:,:,:],A=self.setup['Mixings'][exp,:,:,:],**track_params)
+            for res_var in res_vars:
+                if res_var in res.keys():
+                    algo.results[res_var] = res[res_var]
+        self.store_in_folder(a,K,N)
+
+    def draw_empirical_convergence(self,a,K,N,res_type='costs',mode='time',algos=None):
+        if algos == None:
+            algos = self.algos
+        # xlabels = {'time':'Time (s)','iter':'Nb of iterations'}
+        # ylabels = {'jisi':'jISI score','costs':'cost function','diffs':'criteria'}
+        output_path_individual = self.output_folder+ f'/{self.data_parameters_titles[a]}/N_{N}_K_{K}'
+        fig,ax = plt.subplots()
+        ax.set_yscale('log')
+        for algo in algos:
+            algo.fill_from_folder(output_path_individual)
+            values = algo.results[res_type]
+            if mode == 'time':
+                if 'detailed' in res_type:
+                    times = algo.results['detailed_times']
+                else:
+                    times = algo.results['times']              
+                ax.plot(times,values,color=algo.color,label=algo.legend,linewidth=1)
+            else:
+                ax.plot(values,color=algo.color,label=algo.legend,linewidth=1)
+            ax.legend(loc=1,fontsize=self.legend_fontsize)
+        # ax.set_xlabel(xlabels[mode],fontsize=20)
+        # ax.set_ylabel(ylabels[res_type],fontsize=20)
+        ax.set_title('Empirical convergence',fontsize=self.title_fontsize)
+        for extension in ['eps','png']:
+            fig_path = os.path.join(output_path_individual, res_type + '_' + mode)
+            os.makedirs(os.path.dirname(fig_path), exist_ok=True)
+            fig.savefig(fig_path,dpi=200,format=extension)
+            plt.show()
+
 
 
 # A corriger 
     # def make_charts(self,full=False):
     #     Ks,Ns = self.common_parameters
-    #     for a,metaparam in enumerate(self.meta_parameters):
+    #     for a,dataparam in enumerate(self.data_parameters):
     #         for ik,K in enumerate(Ks):
     #             for jn,N in enumerate(Ns):
-    #                 os.makedirs(self.output_folder+f'/charts/{self.meta_parameters_titles[a]}/N_{N}_K_{K}')
+    #                 os.makedirs(self.output_folder+f'/charts/{self.data_parameters_titles[a]}/N_{N}_K_{K}')
     #                 fig,ax = plt.subplots()
     #                 ax.set_xlabel('Time (s.)',fontsize=self.title_fontsize,labelpad=0)
     #                 ax.set_ylabel('jISI score',fontsize=self.title_fontsize,labelpad=0)
@@ -274,8 +357,8 @@ class ComparisonExperimentIvaG:
     #                 # ax.set_xticklabels(xticklabels)
     #                 if self.legend:
     #                     fig.legend(loc=2,fontsize=self.legend_fontsize)
-    #                 filename = 'comparison {} N = {} K = {}'.format(self.meta_parameters_titles[a],N,K)
-    #                 output_path = self.output_folder+f'/charts/{self.meta_parameters_titles[a]}/N_{N}_K_{K}'
+    #                 filename = 'comparison {} N = {} K = {}'.format(self.data_parameters_titles[a],N,K)
+    #                 output_path = self.output_folder+f'/charts/{self.data_parameters_titles[a]}/N_{N}_K_{K}'
     #                 fig.savefig(output_path,dpi=200,bbox_inches='tight')
     #                 plt.close(fig)
     #         if full:
@@ -293,117 +376,10 @@ class ComparisonExperimentIvaG:
     #                                             color=algo.color,label=algo.legend,elinewidth=2.5)
     #             if self.legend:
     #                 fig.legend(loc=2,fontsize=self.legend_fontsize)
-    #             filename = 'comparison {}.png'.format(self.meta_parameters_titles[a])
-    #             output_path = os.path.join(self.output_folder+'/charts/{}'.format(self.meta_parameters_titles[a]), filename)
+    #             filename = 'comparison {}.png'.format(self.data_parameters_titles[a])
+    #             output_path = os.path.join(self.output_folder+'/charts/{}'.format(self.data_parameters_titles[a]), filename)
     #             fig.savefig(output_path,dpi=200,bbox_inches='tight')
     #             plt.close(fig)
-                                          
-    def store_in_folder(self,N,K,a):
-        output_path_individual = self.output_folder+f'/{self.meta_parameters_titles[a]}/N_{N}_K_{K}'
-        os.makedirs(output_path_individual,exist_ok=True)
-        if not self.exists_setup:
-            output_path_setup = self.output_folder+f'/setup/{self.meta_parameters_titles[a]}/N_{N}_K_{K}'
-            os.makedirs(output_path_setup,exist_ok=True)
-            for setup_var in self.setup.keys():
-                var_path = os.path.join(output_path_setup,setup_var)
-                self.setup[setup_var].tofile(var_path,sep=',')       
-        for algo in self.algos:
-            for result in algo.results.keys():
-                res_path = os.path.join(output_path_individual,algo.name + '_' + result)
-                algo.results[result].tofile(res_path,sep=',')      
-                   
-    def compute_multi_runs(self):
-        Ks,Ns = self.common_parameters
-        for algo in self.algos:
-            algo.results['total_times'] = np.zeros(self.N_exp)
-            algo.results['final_jisi'] = np.zeros(self.N_exp)
-            if (self.updates):
-                algo.results['number_updates'] = np.zeros(self.N_exp)
-        for a,metaparam in enumerate(self.meta_parameters):
-            for ik,K in enumerate(Ks):
-                for jn,N in enumerate(Ns):
-                    output_path_individual = f'{self.output_folder}/{self.meta_parameters_titles[a]}/N_{N}_K_{K}'
-                    if not os.path.exists(output_path_individual) or len(os.listdir(output_path_individual))==0:
-                    # if self.exists_setup:
-                    #     self.get_setup_from_folder(N,K,a)
-                    # else:
-                    #     self.create_setup_multi_runs(metaparam, K, N)
-                        self.create_setup_multi_runs(metaparam,K,N) 
-                        for exp in range(self.N_exp):
-                            for algo in self.algos:
-                                algo.fill_experiment(self.setup['Datasets_cov'][exp,:,:,:,:],self.setup['Mixings'][exp,:,:,:],exp,self.setup['Winits'][exp,:,:,:],self.setup['Cinits'][exp,:,:,:],number_updates=self.updates)
-                                print(a,' K =',K,' N =',N,algo.name,' : ',algo.results['final_jisi'][exp],algo.results['total_times'][exp])
-                                if self.updates:
-                                    print('Number of updates : ', algo.results['number_updates'][exp]) 
-                        self.store_in_folder(N,K,a)
-
-    def create_setup_multi_runs(self,metaparam,K,N):
-        self.setup['Datasets_cov'] = np.zeros((self.N_exp,K,K,N,N))
-        self.setup['Mixings'] = np.zeros((self.N_exp,N,N,K))
-        self.setup['Winits'] = np.zeros((self.N_exp,N,N,K))
-        self.setup['Cinits'] = np.zeros((self.N_exp,K,K,N))
-        for exp in range(self.N_exp):
-            Rx,A = generate_whitened_problem(self.T,K,N,mode=self.mode,metaparam=metaparam)
-            self.setup['Datasets_cov'][exp,:,:,:,:] = Rx
-            self.setup['Mixings'][exp,:,:,:] = A
-            self.setup['Winits'][exp,:,:,:] = make_A(K,N)
-            self.setup['Cinits'][exp,:,:,:] = make_Sigma(K,N,rank=K+10)
-            
-    def compute_empirical_convergence(self,res_vars=['jisi','costs','times'],detailed=False):
-        track_params = {}
-        for var in res_vars:
-            track_params['track_' + var] = True
-            if detailed:
-                    res_vars.append('detailed_' + var)
-        Ks,Ns = self.common_parameters
-        for a,metaparam in enumerate(self.meta_parameters):
-            for ik,K in enumerate(Ks):
-                for jn,N in enumerate(Ns):
-                    if self.exists_setup:
-                        self.get_setup_from_folder()
-                    else:
-                        self.create_setup_empirical_convergence(metaparam,K,N)
-                    for algo in self.algos:
-                        res = algo.solve(self.setup['Datasets_cov'],self.setup['Winit'],self.setup['Cinit'],B=self.setup['Mixing'],**track_params)
-                        for res_var in res_vars:
-                            algo.results[res_var] = res[res_var]
-                    self.store_in_folder(N,K,a)
-       
-    def create_setup_empirical_convergence(self,metaparam,K,N):
-        self.setup['Datasets_cov'],self.setup['Mixing'] = generate_whitened_problem(self.T,K,N,mode=self.mode,metaparam=metaparam,down_sample=False,num_samples=10000,inflate=False,lambda_inflate=1e-3)
-        self.setup['Winit'] = make_A(K,N)
-        self.setup['Cinit'] = make_Sigma(K,N,rank=K+10)
-        
-           
-    def draw_empirical_convergence(self):
-        Ks,Ns = self.common_parameters
-        for a,metaparam in enumerate(self.meta_parameters):
-            for ik,K in enumerate(Ks):
-                for jn,N in enumerate(Ns):
-                    output_path_individual = self.output_folder+ f'/{self.meta_parameters_titles[a]}/N_{N}_K_{K}'
-                    for algo in self.algos:
-                        algo.fill_from_folder(output_path_individual)
-                    res_types = self.algos[0].results.keys() & {'costs','jisi','detailed_costs','detailed_jisi'}
-                    for res_type in res_types:
-                        if 'detailed' in res_type:
-                            times = algo.results['detailed_times']
-                        else:
-                            times = algo.results['times']
-                        fig,ax = plt.subplots()
-                        ax.set_yscale('log')
-                        for algo in self.algos:                        
-                            ax.plot(algo.results[res_type],color=algo.color,label=algo.legend,linewidth=0.5)
-                            ax.legend(loc=1,fontsize=self.legend_fontsize)
-                            for extension in ['.eps','.png']:
-                                fig_path = os.path.join(output_path_individual, res_type, extension)
-                                fig.savefig(fig_path,dpi=200)
-                            ax.plot(algo.results[res_type],times,color=algo.color,label=algo.legend,linewidth=0.5)
-                            ax.legend(loc=1,fontsize=self.legend_fontsize)
-                            for extension in ['.eps','.png']:
-                                fig_path = os.path.join(output_path_individual, res_type, '_times', extension)
-                                fig.savefig(fig_path,dpi=200)
-
-
 
 
 

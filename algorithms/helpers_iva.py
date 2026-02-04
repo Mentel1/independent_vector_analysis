@@ -694,7 +694,7 @@ def _resort_scvs_numpy(W, R_xx, whiten=False, V=None, complex_valued=False, circ
 
         for k1 in range(K):
             for k2 in range(k1, K):
-                Sigma_n[k1, k2] = W[n, :, k1] @ R_xx[:, :, k1, k2] @ np.conj(W[n, :, k2])
+                Sigma_n[k1, k2] = W[n, :, k1] @ R_xx[k1,k2,:,:] @ np.conj(W[n, :, k2])
                 Sigma_n[k2, k1] = np.conj(Sigma_n[k1, k2])  # sigma_n is Hermitian
         Sigma_N[:, :, n] = Sigma_n
 

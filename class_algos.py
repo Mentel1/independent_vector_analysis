@@ -10,7 +10,7 @@ from algorithms.algebra_toolbox_numpy import *
 from algorithms.titan_iva_g_reg_numpy import *
 from algorithms.titan_iva_g_reg_torch import *
 from algorithms.titan_iva_g_reg_numpy_exact_C import *
-from algorithms.AuxIVA_ISS_fakufaku.piva.auxiva_iss import auxiva_iss_py
+# from algorithms.AuxIVA_ISS_fakufaku.piva.auxiva_iss import auxiva_iss_py
 
 class IvaGAlgorithms:
 
@@ -37,8 +37,8 @@ class IvaGAlgorithms:
         actual_cls = getattr(current_module, class_name)
         return actual_cls(**config)
 
-    def fill_experiment(self,Rx,A,exp,Winit=None,Cinit=None,number_updates=False):
-        res = self.solve(Rx,Winit=Winit,Cinit=Cinit,track_schemes=number_updates)
+    def fill_experiment(self,Rx,A,exp,Winit=None,Cinit=None,count_updates=False,track_diffs=False):
+        res = self.solve(Rx,Winit=Winit,Cinit=Cinit,track_schemes=count_updates,track_diffs=track_diffs)
         self.results['total_times'][exp] = res['times'][-1]
         W = res['W']
         if self.library == 'torch':
@@ -46,7 +46,7 @@ class IvaGAlgorithms:
             self.results['final_jisi'][exp] = joint_isi_torch(W,A)
         elif self.library == 'numpy':
             self.results['final_jisi'][exp] = joint_isi_numpy(W,A)
-        if number_updates:
+        if count_updates:
             self.results['number_updates'][exp] = res['N_iter']
 
     def fill_from_folder(self,output_path_individual):
@@ -75,6 +75,7 @@ class IvaG(IvaGAlgorithms):
     def solve(self,Rx,**kwargs):
             Winit = kwargs['Winit']
             self.normalize_Winit(Winit)
+            kwargs.update({'return_W_change' : 'track_diffs' in kwargs.keys() and kwargs['track_diffs']})
             params = self._get_base_params()
             used_params = list(inspect.signature(iva_g_numpy).parameters.keys())
             params.update({k: v for k, v in kwargs.items() if k in used_params})
@@ -133,7 +134,7 @@ class TitanIvaG(IvaGAlgorithms):
     def solve(self,Rx,**kwargs):
         params = self._get_base_params()
         used_params = list(inspect.signature(titan_iva_g_reg_numpy).parameters.keys())
-        params.update({k: v for k, v in kwargs.items() if k in used_params})   
+        params.update({k: v for k, v in kwargs.items() if k in used_params})
         if self.exactC:
             res = titan_iva_g_reg_numpy_exactC(Rx,**params)
         else:
@@ -146,19 +147,19 @@ class TitanIvaG(IvaGAlgorithms):
         return res
 
  
-class AuxIVA_ISS(IvaGAlgorithms):
+# class AuxIVA_ISS(IvaGAlgorithms):
 
-    def __init__(self,color,name='aux_iva_iss',legend='AuxIVA-ISS',n_iter=200,library='numpy',
-                 backend='py',model='laplace',proj_back=False):
-        super().__init__(name=name,legend=legend,color=color,library=library)
-        self.n_iter = n_iter
-        self.backend = backend
-        self.model = model
-        self.proj_back = proj_back
+#     def __init__(self,color,name='aux_iva_iss',legend='AuxIVA-ISS',n_iter=200,library='numpy',
+#                  backend='py',model='laplace',proj_back=False):
+#         super().__init__(name=name,legend=legend,color=color,library=library)
+#         self.n_iter = n_iter
+#         self.backend = backend
+#         self.model = model
+#         self.proj_back = proj_back
         
 
-    def solve(self,X,Winit=None,Cinit=None):
-        X = np.moveaxis(X, 0, 2)
-        _,W = auxiva_iss_py(X,n_iter=self.n_iter, proj_back=self.proj_back, model=self.model, return_filters=True)
-        W = np.moveaxis(W,0,2)
-        return W
+#     def solve(self,X,Winit=None,Cinit=None):
+#         X = np.moveaxis(X, 0, 2)
+#         _,W = auxiva_iss_py(X,n_iter=self.n_iter, proj_back=self.proj_back, model=self.model, return_filters=True)
+#         W = np.moveaxis(W,0,2)
+#         return W

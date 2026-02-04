@@ -46,7 +46,7 @@ from .helpers_iva import  _decouple_trick_numpy,_bss_isi,whiten_data_numpy,fast_
     _resort_scvs_numpy,_normalize_column_vectors
 from .initializations import _jbss_sos,_cca
 
-def iva_g_numpy(Rx,opt_approach='newton',complex_valued=False,circular=False,whiten=True,
+def iva_g_numpy(Rx,opt_approach='newton',complex_valued=False,circular=False,whiten=False,
           verbose=False,A=None,W_init=None,jdiag_initW=False,max_iter=1024,W_diff_stop=1e-6,alpha0=1.0,return_W_change=False):
     """
     Implementation of all the second-order (Gaussian) independent vector analysis (IVA) algorithms.
@@ -196,8 +196,8 @@ def iva_g_numpy(Rx,opt_approach='newton',complex_valued=False,circular=False,whi
     # complex_valued = complex_valued or np.any(np.iscomplex(A)) or np.any(np.iscomplex(X))
 
     # whitening is required for the quasi & complex-valued gradient approach
-    whiten = whiten or (opt_approach == 'quasi') or (
-            complex_valued and opt_approach == 'gradient')
+    
+    #whiten = whiten or (opt_approach == 'quasi') or (complex_valued and opt_approach == 'gradient')
 
     # test if data is zero-mean (test added by Isabell Lehmann)
     # if np.linalg.norm(np.mean(X,axis=1)) > 1e-12:
@@ -341,7 +341,7 @@ def iva_g_numpy(Rx,opt_approach='newton',complex_valued=False,circular=False,whi
 
             for k1 in range(K):
                 for k2 in range(k1,K):
-                    Sigma_n[k1,k2] = W[n,:,k1] @ Rx[:,:,k1,k2] @ np.conj(W[n,:,k2])
+                    Sigma_n[k1,k2] = W[n,:,k1] @ Rx[k1,k2,:,:] @ np.conj(W[n,:,k2])
                     Sigma_n[k2,k1] = np.conj(Sigma_n[k1,k2])
 
             if complex_valued and not circular:
@@ -378,11 +378,11 @@ def iva_g_numpy(Rx,opt_approach='newton',complex_valued=False,circular=False,whi
 
                 if complex_valued and not circular:
                     for kk in range(K):
-                        grad[:,k] += Rx[:,:,k,kk] @ np.conj(W[n,:,kk]) * np.conj(P[k,kk]) \
+                        grad[:,k] += Rx[k,kk,:,:] @ np.conj(W[n,:,kk]) * np.conj(P[k,kk]) \
                                       + P_xx[:,:,k,kk] @ W[n,:,kk] * np.conj(Pt[k,kk])
                 else:
                     for kk in range(K):
-                        grad[:,k] += Rx[:,:,k,kk] @ np.conj(W[n,:,kk]) * Sigma_inv[kk,k]
+                        grad[:,k] += Rx[k,kk,:,:] @ np.conj(W[n,:,kk]) * Sigma_inv[kk,k]
 
                 if opt_approach == 'gradient' or (opt_approach == 'quasi' and not complex_valued):
                     wnk = np.conj(W[n,:,k])
@@ -394,7 +394,7 @@ def iva_g_numpy(Rx,opt_approach='newton',complex_valued=False,circular=False,whi
                         W[n,:,k] = np.conj((wnk - alpha0 * grad_norm_proj)/np.linalg.norm(wnk - alpha0 * grad_norm_proj))
 
                         for kk in range(K):  # = 1/T * Y_n @ np.conj(Yn.T)
-                            Sigma_n[k,kk] = W[n,:,k] @ Rx[:,:,k,kk] @ np.conj(W[n,:,kk].T)
+                            Sigma_n[k,kk] = W[n,:,k] @ Rx[k,kk,:,:] @ np.conj(W[n,:,kk].T)
                         Sigma_n[:,k] = np.conj(Sigma_n[k,:].T)
 
                         if complex_valued and not circular:
@@ -431,10 +431,10 @@ def iva_g_numpy(Rx,opt_approach='newton',complex_valued=False,circular=False,whi
                                 HA[k1 * N:k1 * N + N,k1 * N:k1 * N + N] += Pt[k1,k1] * np.conj(
                                     P_xx[:,:,k1,k1])
                         H[k1 * N:(k1 + 1) * N,k1 * N:(k1 + 1) * N] = np.conj(
-                            Sigma_inv[k1,k1] * Rx[:,:,k1,k1])
+                            Sigma_inv[k1,k1] * Rx[k1,k1,:,:])
                     else:  # real-valued Newton
                         H[k1 * N:k1 * N + N,k1 * N:k1 * N + N] = \
-                            Sigma_inv[k1,k1] * Rx[:,:,k1,k1] + np.outer(
+                            Sigma_inv[k1,k1] * Rx[k1,k1,:,:] + np.outer(
                                 hnk[:,k1],hnk[:,k1]) / (hnk[:,k1] @ W[n,:,k1]) ** 2
 
                     for k2 in range(k1 + 1,K):
@@ -444,9 +444,9 @@ def iva_g_numpy(Rx,opt_approach='newton',complex_valued=False,circular=False,whi
                                 P_xx[:,:,k1,k2])
                             HA[k2 * N: k2 * N + N,k1 * N: k1 * N + N] = Pt[k1,k2] * np.conj(
                                 P_xx[:,:,k2,k1])
-                            Hs = np.conj(P[k2,k1] * Rx[:,:,k1,k2])
+                            Hs = np.conj(P[k2,k1] * Rx[k1,k2,:,:])
                         else:
-                            Hs = Sigma_inv[k1,k2] * Rx[:,:,k2,k1].T
+                            Hs = Sigma_inv[k1,k2] * Rx[k2,k1,:,:].T
                         H[k1 * N: k1 * N + N,k2 * N: k2 * N + N] = Hs
                         H[k2 * N: k2 * N + N,k1 * N: k1 * N + N] = np.conj(Hs.T)
 
@@ -529,7 +529,7 @@ def iva_g_numpy(Rx,opt_approach='newton',complex_valued=False,circular=False,whi
         # Scale demixing vectors to generate unit variance sources
         for n in range(N):
             for k in range(K):
-                W[n,:,k] /= np.sqrt(W[n,:,k] @ Rx[:,:,k,k] @ np.conj(W[n,:,k]))
+                W[n,:,k] /= np.sqrt(W[n,:,k] @ Rx[k,k,:,:] @ np.conj(W[n,:,k]))
 
     # Resort order of SCVs: Order the components from most to least ill-conditioned
     if not complex_valued or circular:
@@ -543,9 +543,9 @@ def iva_g_numpy(Rx,opt_approach='newton',complex_valued=False,circular=False,whi
     if verbose:
         print(f"IVA-G finished after {(end - start) / 60} minutes with {iteration} iterations.")
 
-    result = {'W':W,'cost':cost,'Sigma_N':Sigma_N,'jisi':jisi,'times':times,'N_iter':np.size(times)}
+    result = {'W':W,'costs':cost,'Sigma_N':Sigma_N,'jisi':jisi,'times':np.array(times),'N_iter':np.size(times)}
     if return_W_change:
-        result.update({'W_change':W_change})
+        result.update({'diffs_W':np.array(W_change)})
     return result
    
 
